@@ -380,7 +380,7 @@ HashTable *excimer_log_trace_to_array(excimer_log *log, zend_long l_frame_index)
 
 		frame_index = frame->prev_index;
 	}
-	
+
 	return ht_trace;
 }
-	
+

@@ -96,7 +96,7 @@ typedef struct _excimer_log {
 	 * backtrace is truncated.
 	 */
 	zend_long max_depth;
-	
+
 	/**
 	 * This is used by ExcimerProfiler to store the creation time of the
 	 * ExcimerProfiler object.

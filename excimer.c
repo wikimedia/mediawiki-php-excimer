@@ -548,7 +548,7 @@ static zend_object *ExcimerProfiler_new(zend_class_entry *ce) /* {{{ */
 	ExcimerLog_obj *log_obj;
 	struct timespec now_ts;
 
-	clock_gettime(CLOCK_MONOTONIC, &now_ts);	
+	clock_gettime(CLOCK_MONOTONIC, &now_ts);
 
 	object_init_ex(&profiler->z_log, ExcimerLog_ce);
 	log_obj = EXCIMER_OBJ_Z(ExcimerLog, profiler->z_log);
@@ -588,6 +588,7 @@ static void ExcimerProfiler_dtor(zend_object *object) /* {{{ */
 		zval_ptr_dtor(&z_old_log);
 	}
 }
+/* }}} */
 
 /* {{{ proto void ExcimerProfiler::setPeriod(float period)
  */
@@ -865,7 +866,7 @@ static zend_object_iterator *ExcimerLog_get_iterator(
 	iterator = emalloc(sizeof(ExcimerLog_iterator));
 	zend_iterator_init((zend_object_iterator*)iterator);
 
-	ZVAL_COPY(&iterator->intern.it.data, zp_log);	
+	ZVAL_COPY(&iterator->intern.it.data, zp_log);
 
 	iterator->intern.it.funcs = &ExcimerLog_iterator_funcs;
 	iterator->intern.ce = ce;
@@ -891,7 +892,7 @@ static int ExcimerLog_iterator_valid(zend_object_iterator *iter) /* {{{ */
 {
 	ExcimerLog_iterator *iterator = (ExcimerLog_iterator*)iter;
 	ExcimerLog_obj *log_obj = EXCIMER_OBJ_Z(ExcimerLog, iterator->intern.it.data);
-	
+
 	if (iterator->index < log_obj->log.entries_size) {
 		return SUCCESS;
 	} else {
@@ -958,7 +959,7 @@ static void ExcimerLog_iterator_invalidate_current(zend_object_iterator *iter) /
 	ExcimerLog_iterator *iterator = (ExcimerLog_iterator*)iter;
 
 	zval_ptr_dtor(&iterator->z_current);
-	ZVAL_NULL(&iterator->z_current);	
+	ZVAL_NULL(&iterator->z_current);
 }
 /* }}} */
 
@@ -1107,7 +1108,7 @@ static PHP_METHOD(ExcimerLog, offsetExists)
 	zend_long offset;
 
 	ZEND_PARSE_PARAMETERS_START(1, 1);
-		Z_PARAM_LONG(offset)	
+		Z_PARAM_LONG(offset)
 	ZEND_PARSE_PARAMETERS_END();
 
 	if (offset >= 0 && offset < log_obj->log.entries_size) {
@@ -1116,6 +1117,7 @@ static PHP_METHOD(ExcimerLog, offsetExists)
 		RETURN_FALSE;
 	}
 }
+/* }}} */
 
 /* {{{ proto mixed ExcimerLog::offsetGet(mixed offset) */
 static PHP_METHOD(ExcimerLog, offsetGet)
@@ -1124,7 +1126,7 @@ static PHP_METHOD(ExcimerLog, offsetGet)
 	zend_long offset;
 
 	ZEND_PARSE_PARAMETERS_START(1, 1);
-		Z_PARAM_LONG(offset)	
+		Z_PARAM_LONG(offset)
 	ZEND_PARSE_PARAMETERS_END();
 
 	if (offset < 0 || offset >= log_obj->log.entries_size) {
@@ -1133,18 +1135,21 @@ static PHP_METHOD(ExcimerLog, offsetGet)
 
 	ExcimerLog_init_entry(return_value, getThis(), offset);
 }
+/* }}} */
 
 /* {{{ proto void ExcimerLog::offsetSet(mixed offset, mixed value) */
 static PHP_METHOD(ExcimerLog, offsetSet)
 {
 	php_error_docref(NULL, E_WARNING, "ExcimerLog cannot be modified");
 }
+/* }}} */
 
 /* {{{ proto void ExcimerLog::offsetUnset(mixed offset) */
 static PHP_METHOD(ExcimerLog, offsetUnset)
 {
 	php_error_docref(NULL, E_WARNING, "ExcimerLog cannot be modified");
 }
+/* }}} */
 
 static zend_object *ExcimerLogEntry_new(zend_class_entry *ce) /* {{{ */
 {
@@ -1292,7 +1297,7 @@ static PHP_METHOD(ExcimerTimer, setCallback)
 }
 /* }}} */
 
-static int ExcimerTimer_set_callback(ExcimerTimer_obj *timer_obj, zval *zp_callback)
+static int ExcimerTimer_set_callback(ExcimerTimer_obj *timer_obj, zval *zp_callback) /* {{{ */
 {
 	char *is_callable_error;
 
@@ -1306,7 +1311,7 @@ static int ExcimerTimer_set_callback(ExcimerTimer_obj *timer_obj, zval *zp_callb
 	ZVAL_COPY(&timer_obj->z_callback, zp_callback);
 	return SUCCESS;
 }
-
+/* }}} */
 
 /* {{{ proto void ExcimerTimer::start()
  */
@@ -1400,7 +1405,7 @@ static void ExcimerTimer_event(zend_long event_count, void *user_data) /* {{{ */
 		ExcimerTimer_stop(timer_obj);
 		return;
 	}
-	
+
 	fci.retval = &retval;
 	ZVAL_LONG(&z_event_count, event_count);
 
@@ -1435,6 +1440,7 @@ PHP_FUNCTION(excimer_set_timeout)
 	excimer_set_timespec(&timer_obj->initial, initial);
 	ExcimerTimer_start(timer_obj);
 }
+/* }}} */
 
 static const zend_module_dep excimer_deps[] = {
 #if PHP_VERSION_ID < 70200
