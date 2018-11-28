@@ -85,6 +85,7 @@ check_collapsed($collapsed, 'member', '!cpu.php;foo;bar;C::member \d+$!m');
 // Test foreach (get_iterator handler)
 $found = [];
 $count = 0;
+$eventCount = 0;
 $traces = [];
 $firstTimestamp = false;
 $lastTimestamp = false;
@@ -139,8 +140,12 @@ foreach ($log as $entry) {
 	}
 	$lastTimestamp = $entry->getTimestamp();
 
+	assert( $entry->getEventCount() > 0 );
+	$eventCount += $entry->getEventCount();
 	$count++;
 }
+
+assert( $log->getEventCount() === $eventCount );
 
 function check_found($found, $func) {
 	if (isset($found[$func])) {
@@ -171,6 +176,26 @@ for ($log->rewind(); $log->valid(); $log->next(), $count++) {
 	assert(serialize($entry->getTrace()) == serialize($traces[$count]));
 }
 assert($count == $log->count());
+
+// Test aggregateByFunction
+// Typically the parent functions foo() and bar() will have self=0 and
+// inclusive ~= 30. The other 4 functions will have a count of about 30/4 = 7.5.
+// The probability of C::member() or baz() having a count of zero is about 1 in 5600.
+$stats = $log->aggregateByFunction();
+assert($stats['foo']['inclusive'] > 10);
+assert($stats['foo']['self'] < 10);
+assert($stats['bar']['inclusive'] > 10);
+assert($stats['bar']['self'] < 10);
+assert($stats['C::member']['inclusive'] > 0);
+assert($stats['C::member']['self'] > 0);
+assert($stats['baz']['inclusive'] > 0);
+assert($stats['baz']['self'] > 0);
+
+// Ensure $stats is sorted
+$counts = array_column( $stats, 'inclusive' );
+$sortedCounts = $counts;
+rsort( $sortedCounts );
+assert( $sortedCounts === $counts );
 
 --EXPECT--
 formatCollapsed baz: OK

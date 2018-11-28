@@ -102,6 +102,11 @@ typedef struct _excimer_log {
 	 * ExcimerProfiler object.
 	 */
 	uint64_t epoch;
+
+	/**
+	 * The sum of the event counts of all contained log entries
+	 */
+	zend_long event_count;
 } excimer_log;
 
 /**
@@ -179,6 +184,11 @@ excimer_log_frame *excimer_log_get_frame(excimer_log *log, zend_long i);
  * @return A new zend_string owned by the caller
  */
 zend_string *excimer_log_format_collapsed(excimer_log *log);
+
+/**
+ * Aggregate the log producing self/inclusive statistics as an array
+ */
+HashTable *excimer_log_aggr_by_func(excimer_log *log);
 
 /**
  * Convert a frame to a backtrace array for returning to the user

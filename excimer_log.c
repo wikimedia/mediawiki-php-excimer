@@ -85,6 +85,7 @@ void excimer_log_init(excimer_log *log)
 	log->frames_size = 1;
 	log->reverse_frames = excimer_log_new_array(0);
 	log->epoch = 0;
+	log->event_count = 0;
 }
 
 void excimer_log_destroy(excimer_log *log)
@@ -133,6 +134,7 @@ void excimer_log_add(excimer_log *log, zend_execute_data *execute_data,
 	entry = &log->entries[log->entries_size++];
 	entry->frame_index = frame_index;
 	entry->event_count = event_count;
+	log->event_count += event_count;
 	entry->timestamp = timestamp;
 }
 
@@ -314,21 +316,21 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 				smart_str_appends(&buf, ";");
 			}
 
-			if (frame->class_name) {
-				excimer_log_append_no_spaces(&buf, frame->class_name);
-				smart_str_appends(&buf, "::");
-			}
-			if (frame->function_name == NULL) {
-				/* For file-scope code, use the file name */
-				excimer_log_append_no_spaces(&buf, frame->filename);
-			} else if (frame->closure_line != 0) {
+			if (frame->closure_line != 0) {
 				/* Annotate anonymous functions with their source location.
 				 * Example: {closure:/path/to/file.php(123)}
 				 */
 				smart_str_appends(&buf, "{closure:");
 				excimer_log_append_no_spaces(&buf, frame->filename);
 				excimer_log_smart_str_append_printf(&buf, "(%d)}", frame->closure_line);
+			} else if (frame->function_name == NULL) {
+				/* For file-scope code, use the file name */
+				excimer_log_append_no_spaces(&buf, frame->filename);
 			} else {
+				if (frame->class_name) {
+					excimer_log_append_no_spaces(&buf, frame->class_name);
+					smart_str_appends(&buf, "::");
+				}
 				excimer_log_append_no_spaces(&buf, frame->function_name);
 			}
 		}
@@ -342,38 +344,45 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 	return excimer_log_smart_str_extract(&buf);
 }
 
+HashTable *excimer_log_frame_to_array(excimer_log_frame *frame) {
+	HashTable *ht_func = excimer_log_new_array(0);
+	zval tmp;
+
+	if (frame->filename) {
+		ZVAL_STR_COPY(&tmp, frame->filename);
+		zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_FILE), &tmp);
+		ZVAL_LONG(&tmp, frame->lineno);
+		zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_LINE), &tmp);
+	}
+
+	if (frame->class_name) {
+		ZVAL_STR_COPY(&tmp, frame->class_name);
+		zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_CLASS), &tmp);
+	}
+
+	if (frame->function_name) {
+		ZVAL_STR_COPY(&tmp, frame->function_name);
+		zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_FUNCTION), &tmp);
+	}
+
+	if (frame->closure_line) {
+		zend_string *s = zend_string_init("closure_line", sizeof("closure_line") - 1, 0);
+		ZVAL_LONG(&tmp, frame->closure_line);
+		zend_hash_add_new(ht_func, s, &tmp);
+		zend_string_delref(s);
+	}
+
+	return ht_func;
+}
+
 HashTable *excimer_log_trace_to_array(excimer_log *log, zend_long l_frame_index)
 {
 	HashTable *ht_trace = excimer_log_new_array(0);
 	uint32_t frame_index = excimer_safe_uint32(l_frame_index);
 	while (frame_index) {
-		HashTable *ht_func = excimer_log_new_array(0);
-		zval tmp;
 		excimer_log_frame *frame = excimer_log_get_frame(log, frame_index);
-
-		if (frame->filename) {
-			ZVAL_STR_COPY(&tmp, frame->filename);
-			zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_FILE), &tmp);
-			ZVAL_LONG(&tmp, frame->lineno);
-			zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_LINE), &tmp);
-		}
-
-		if (frame->class_name) {
-			ZVAL_STR_COPY(&tmp, frame->class_name);
-			zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_CLASS), &tmp);
-		}
-
-		if (frame->function_name) {
-			ZVAL_STR_COPY(&tmp, frame->function_name);
-			zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_FUNCTION), &tmp);
-		}
-
-		if (frame->closure_line) {
-			zend_string *s = zend_string_init("closure_line", sizeof("closure_line") - 1, 0);
-			ZVAL_LONG(&tmp, frame->closure_line);
-			zend_hash_add_new(ht_func, s, &tmp);
-			zend_string_delref(s);
-		}
+		HashTable *ht_func = excimer_log_frame_to_array(frame);
+		zval tmp;
 
 		ZVAL_ARR(&tmp, ht_func);
 		zend_hash_next_index_insert(ht_trace, &tmp);
@@ -384,3 +393,109 @@ HashTable *excimer_log_trace_to_array(excimer_log *log, zend_long l_frame_index)
 	return ht_trace;
 }
 
+/**
+ * ht[key] += term;
+ */
+static void excimer_log_array_incr(HashTable *ht, zend_string *sp_key, zend_long term)
+{
+	zval *zp_value = zend_hash_find(ht, sp_key);
+	if (!zp_value) {
+		zval z_tmp;
+		ZVAL_LONG(&z_tmp, term);
+		zend_hash_add_new(ht, sp_key, &z_tmp);
+	} else {
+		Z_LVAL_P(zp_value) += term;
+	}
+}
+
+static int excimer_log_aggr_compare(const void *a, const void *b)
+{
+	zval *zp_a = &((Bucket*)a)->val;
+	zval *zp_b = &((Bucket*)b)->val;
+
+	zval *zp_a_incl = zend_hash_str_find(Z_ARRVAL_P(zp_a), "inclusive", sizeof("inclusive")-1);
+	zval *zp_b_incl = zend_hash_str_find(Z_ARRVAL_P(zp_b), "inclusive", sizeof("inclusive")-1);
+
+	return ZEND_NORMALIZE_BOOL(Z_LVAL_P(zp_b_incl) - Z_LVAL_P(zp_a_incl));
+}
+
+HashTable *excimer_log_aggr_by_func(excimer_log *log)
+{
+	HashTable *ht_result = excimer_log_new_array(0);
+	zend_string *sp_inclusive = zend_string_init("inclusive", sizeof("inclusive")-1, 0);
+	zend_string *sp_self = zend_string_init("self", sizeof("self")-1, 0);
+	HashTable *ht_unique_names = excimer_log_new_array(0);
+	size_t entry_index;
+	zval z_zero;
+
+	ZVAL_LONG(&z_zero, 0);
+
+	for (entry_index = 0; entry_index < log->entries_size; entry_index++) {
+		excimer_log_entry *entry = excimer_log_get_entry(log, entry_index);
+		uint32_t frame_index = entry->frame_index;
+		int is_top = 1;
+
+		while (frame_index) {
+			excimer_log_frame *frame = excimer_log_get_frame(log, frame_index);
+			smart_str ss_name = {NULL};
+			zend_string *sp_name;
+			zval *zp_info;
+			zval z_tmp;
+
+			/* Make a human-readable name */
+			if (frame->closure_line != 0) {
+				/* Annotate anonymous functions with their source location.
+				 * Example: {closure:/path/to/file.php(123)}
+				 */
+				smart_str_appends(&ss_name, "{closure:");
+				smart_str_append(&ss_name, frame->filename);
+				excimer_log_smart_str_append_printf(&ss_name, "(%d)}", frame->closure_line);
+			} else if (frame->function_name == NULL) {
+				/* For file-scope code, use the file name */
+				smart_str_append(&ss_name, frame->filename);
+			} else {
+				if (frame->class_name) {
+					smart_str_append(&ss_name, frame->class_name);
+					smart_str_appends(&ss_name, "::");
+				}
+				smart_str_append(&ss_name, frame->function_name);
+			}
+			sp_name = excimer_log_smart_str_extract(&ss_name);
+
+			/* If it is not in ht_result, add it, along with frame info */
+			zp_info = zend_hash_find(ht_result, sp_name);
+			if (!zp_info) {
+				ZVAL_ARR(&z_tmp, excimer_log_frame_to_array(frame));
+				zend_hash_add_new(Z_ARRVAL(z_tmp), sp_self, &z_zero);
+				zend_hash_add_new(Z_ARRVAL(z_tmp), sp_inclusive, &z_zero);
+				zp_info = zend_hash_add(ht_result, sp_name, &z_tmp);
+			}
+
+			/* If this is the top frame of a log entry, increment the "self" key */
+			if (is_top) {
+				excimer_log_array_incr(Z_ARRVAL_P(zp_info), sp_self, entry->event_count);
+			}
+
+			/* If this is the first instance of a function in an entry, i.e.
+			 * counting recursive functions only once, increment the "inclusive" key */
+			if (zend_hash_find(ht_unique_names, sp_name) == NULL) {
+				excimer_log_array_incr(Z_ARRVAL_P(zp_info), sp_inclusive, entry->event_count);
+				/* Add the function to the unique_names array */
+				zend_hash_add_new(ht_unique_names, sp_name, &z_zero);
+			}
+
+			is_top = 0;
+			frame_index = frame->prev_index;
+			zend_string_delref(sp_name);
+		}
+		zend_hash_clean(ht_unique_names);
+	}
+	zend_hash_destroy(ht_unique_names);
+	zend_string_delref(sp_self);
+	zend_string_delref(sp_inclusive);
+
+	/* Sort the result in descending order by inclusive */
+	zend_hash_sort(ht_result, excimer_log_aggr_compare, 0);
+
+	return ht_result;
+}

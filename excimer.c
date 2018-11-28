@@ -181,6 +181,8 @@ static void ExcimerLog_iterator_invalidate_current(zend_object_iterator *iter);
 
 static PHP_METHOD(ExcimerLog, __construct);
 static PHP_METHOD(ExcimerLog, formatCollapsed);
+static PHP_METHOD(ExcimerLog, aggregateByFunction);
+static PHP_METHOD(ExcimerLog, getEventCount);
 static PHP_METHOD(ExcimerLog, current);
 static PHP_METHOD(ExcimerLog, key);
 static PHP_METHOD(ExcimerLog, next);
@@ -197,6 +199,7 @@ static void ExcimerLogEntry_free_object(zend_object *object);
 
 static PHP_METHOD(ExcimerLogEntry, __construct);
 static PHP_METHOD(ExcimerLogEntry, getTimestamp);
+static PHP_METHOD(ExcimerLogEntry, getEventCount);
 static PHP_METHOD(ExcimerLogEntry, getTrace);
 
 static zend_object *ExcimerTimer_new(zend_class_entry *ce);
@@ -266,6 +269,12 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_formatCollapsed, 0)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_aggregateByFunction, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_getEventCount, 0)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_current, 0)
 ZEND_END_ARG_INFO()
 
@@ -305,6 +314,9 @@ ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLogEntry___construct, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLogEntry_getTimestamp, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLogEntry_getEventCount, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLogEntry_getTrace, 0)
@@ -360,6 +372,8 @@ static const zend_function_entry ExcimerLog_methods[] = {
 	PHP_ME(ExcimerLog, __construct, arginfo_ExcimerLog___construct,
 		ZEND_ACC_PRIVATE | ZEND_ACC_FINAL)
 	PHP_ME(ExcimerLog, formatCollapsed, arginfo_ExcimerLog_formatCollapsed, 0)
+	PHP_ME(ExcimerLog, aggregateByFunction, arginfo_ExcimerLog_aggregateByFunction, 0)
+	PHP_ME(ExcimerLog, getEventCount, arginfo_ExcimerLog_getEventCount, 0)
 	PHP_ME(ExcimerLog, current, arginfo_ExcimerLog_current, 0)
 	PHP_ME(ExcimerLog, key, arginfo_ExcimerLog_key, 0)
 	PHP_ME(ExcimerLog, next, arginfo_ExcimerLog_next, 0)
@@ -387,6 +401,7 @@ static const zend_function_entry ExcimerLogEntry_methods[] = {
 	PHP_ME(ExcimerLogEntry, __construct, arginfo_ExcimerLogEntry___construct,
 		ZEND_ACC_PRIVATE | ZEND_ACC_FINAL)
 	PHP_ME(ExcimerLogEntry, getTimestamp, arginfo_ExcimerLogEntry_getTimestamp, 0)
+	PHP_ME(ExcimerLogEntry, getEventCount, arginfo_ExcimerLogEntry_getEventCount, 0)
 	PHP_ME(ExcimerLogEntry, getTrace, arginfo_ExcimerLogEntry_getTrace, 0)
 	PHP_FE_END
 };
@@ -1005,6 +1020,24 @@ static PHP_METHOD(ExcimerLog, formatCollapsed)
 }
 /* }}} */
 
+/* {{{ proto string ExcimerLog::aggregateByFunction()
+ */
+static PHP_METHOD(ExcimerLog, aggregateByFunction)
+{
+	ExcimerLog_obj *log_obj = EXCIMER_OBJ_ZP(ExcimerLog, getThis());
+	RETURN_ARR(excimer_log_aggr_by_func(&log_obj->log));
+}
+/* }}} */
+
+/* {{{ proto string ExcimerLog::getEventCount()
+ */
+static PHP_METHOD(ExcimerLog, getEventCount)
+{
+	ExcimerLog_obj *log_obj = EXCIMER_OBJ_ZP(ExcimerLog, getThis());
+	RETURN_LONG(log_obj->log.event_count);
+}
+/* }}} */
+
 /* {{{ proto array ExcimerLog::current()
  */
 static PHP_METHOD(ExcimerLog, current)
@@ -1189,6 +1222,21 @@ static PHP_METHOD(ExcimerLogEntry, getTimestamp)
 	ZEND_PARSE_PARAMETERS_END();
 
 	RETURN_DOUBLE((entry->timestamp - log_obj->log.epoch) / 1e9);
+}
+/* }}} */
+
+/* {{{ proto float ExcimerLogEntry::getEventCount()
+ */
+static PHP_METHOD(ExcimerLogEntry, getEventCount)
+{
+	ExcimerLogEntry_obj *entry_obj = EXCIMER_OBJ_ZP(ExcimerLogEntry, getThis());
+	ExcimerLog_obj *log_obj = EXCIMER_OBJ_ZP(ExcimerLog, &entry_obj->z_log);
+	excimer_log_entry *entry = excimer_log_get_entry(&log_obj->log, entry_obj->index);
+
+	ZEND_PARSE_PARAMETERS_START(0, 0);
+	ZEND_PARSE_PARAMETERS_END();
+
+	RETURN_LONG(entry->event_count);
 }
 /* }}} */
 
