@@ -656,10 +656,6 @@ static PHP_METHOD(ExcimerProfiler, setMaxDepth)
 
 	ExcimerProfiler_obj *profiler = EXCIMER_OBJ_ZP(ExcimerProfiler, getThis());
 	ExcimerLog_obj *log_obj = EXCIMER_OBJ_ZP(ExcimerLog, &profiler->z_log);
-	if (log_obj) {
-		// After destructor
-		return;
-	}
 	excimer_log_set_max_depth(&log_obj->log, max_depth);
 }
 /* }}} */
