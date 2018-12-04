@@ -2,6 +2,8 @@
 ExcimerProfiler CPU profile
 --SKIPIF--
 <?php if (!extension_loaded("excimer")) print "skip"; ?>
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 
