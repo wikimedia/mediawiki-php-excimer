@@ -167,7 +167,12 @@ static PHP_METHOD(ExcimerProfiler, flush);
 static zend_object *ExcimerLog_new(zend_class_entry *ce);
 static void ExcimerLog_free_object(zend_object *object);
 static zend_object_iterator *ExcimerLog_get_iterator(zend_class_entry *ce, zval *object, int by_ref);
+
+#if PHP_VERSION_ID < 80000
 static int ExcimerLog_count_elements(zval *zp_log, zend_long *lp_count);
+#else
+static int ExcimerLog_count_elements(zend_object *object, zend_long *lp_count);
+#endif
 
 static void ExcimerLog_init_entry(zval *zp_dest, zval *zp_log, zend_long index);
 
@@ -991,6 +996,7 @@ static void ExcimerLog_init_entry(zval *zp_dest, zval *zp_log, zend_long index) 
 }
 /* }}} */
 
+#if PHP_VERSION_ID < 80000
 static int ExcimerLog_count_elements(zval *zp_log, zend_long *lp_count) /* {{{ */
 {
 	ExcimerLog_obj *log_obj = EXCIMER_OBJ_ZP(ExcimerLog, zp_log);
@@ -998,6 +1004,15 @@ static int ExcimerLog_count_elements(zval *zp_log, zend_long *lp_count) /* {{{ *
 	return SUCCESS;
 }
 /* }}} */
+#else
+static int ExcimerLog_count_elements(zend_object *object, zend_long *lp_count) /* {{{ */
+{
+	ExcimerLog_obj *log_obj = EXCIMER_OBJ(ExcimerLog, object);
+	*lp_count = log_obj->log.entries_size;
+	return SUCCESS;
+}
+/* }}} */
+#endif
 
 /* {{{ proto void ExcimerLog::__construct()
  */
