@@ -11,6 +11,9 @@ class ExcimerProfiler {
 	 *
 	 * This will take effect the next time start() is called.
 	 *
+	 * If this method is not called, the default period of 0.1 seconds
+	 * will be used.
+	 *
 	 * @param float $period The period in seconds
 	 */
 	public function setPeriod( $period ) {

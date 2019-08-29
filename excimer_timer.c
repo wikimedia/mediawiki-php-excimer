@@ -198,6 +198,12 @@ void excimer_timer_start(excimer_timer *timer,
 	if (excimer_timer_is_zero(initial)) {
 		its.it_value = *period;
 	}
+	/* If the value is still zero, flag an error */
+	if (excimer_timer_is_zero(&its.it_value)) {
+		php_error_docref(NULL, E_WARNING, "Unable to start timer with a value of zero "
+			"duration and period");
+		return;
+	}
 
 	if (timer_settime(timer->timer_id, 0, &its, NULL) == 0) {
 		timer->is_running = 1;

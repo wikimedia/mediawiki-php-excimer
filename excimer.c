@@ -45,6 +45,8 @@
 #define EXCIMER_NEW_OBJECT(type, ce) \
 	excimer_object_alloc_init(sizeof(type ## _obj), &type ## _handlers, ce)
 
+#define EXCIMER_DEFAULT_PERIOD 0.1
+
 /* {{{ types */
 
 /**
@@ -562,6 +564,7 @@ static zend_object *ExcimerProfiler_new(zend_class_entry *ce) /* {{{ */
 	ExcimerProfiler_obj *profiler = EXCIMER_NEW_OBJECT(ExcimerProfiler, ce);
 	ExcimerLog_obj *log_obj;
 	struct timespec now_ts;
+	double initial;
 
 	clock_gettime(CLOCK_MONOTONIC, &now_ts);
 
@@ -572,6 +575,11 @@ static zend_object *ExcimerProfiler_new(zend_class_entry *ce) /* {{{ */
 
 	ZVAL_NULL(&profiler->z_callback);
 	profiler->event_type = EXCIMER_REAL;
+
+	// Stagger start time
+	initial = php_mt_rand() * EXCIMER_DEFAULT_PERIOD / UINT32_MAX;
+	excimer_set_timespec(&profiler->initial, initial);
+	excimer_set_timespec(&profiler->period, EXCIMER_DEFAULT_PERIOD);
 
 	return &profiler->std;
 }
