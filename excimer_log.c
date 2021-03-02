@@ -408,10 +408,17 @@ static void excimer_log_array_incr(HashTable *ht, zend_string *sp_key, zend_long
 	}
 }
 
+#if PHP_VERSION_ID < 80000
 static int excimer_log_aggr_compare(const void *a, const void *b)
 {
 	zval *zp_a = &((Bucket*)a)->val;
 	zval *zp_b = &((Bucket*)b)->val;
+#else
+static int excimer_log_aggr_compare(Bucket *a, Bucket *b)
+{
+	zval *zp_a = &a->val;
+	zval *zp_b = &b->val;
+#endif
 
 	zval *zp_a_incl = zend_hash_str_find(Z_ARRVAL_P(zp_a), "inclusive", sizeof("inclusive")-1);
 	zval *zp_b_incl = zend_hash_str_find(Z_ARRVAL_P(zp_b), "inclusive", sizeof("inclusive")-1);
