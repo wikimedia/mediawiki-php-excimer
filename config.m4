@@ -14,5 +14,5 @@ if test "$PHP_EXCIMER" != "no"; then
   ])
 
   PHP_SUBST(EXCIMER_SHARED_LIBADD)
-  PHP_NEW_EXTENSION(excimer, excimer.c excimer_timer.c excimer_log.c, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
+  PHP_NEW_EXTENSION(excimer, excimer.c excimer_timer.c excimer_log.c, $ext_shared)
 fi
