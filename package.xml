@@ -13,6 +13,18 @@
   <email>tstarling@wikimedia.org</email>
   <active>yes</active>
  </lead>
+ <lead>
+  <name>Kunal Mehta</name>
+  <user>legoktm</user>
+  <email>legoktm@member.fsf.org</email>
+  <active>yes</active>
+ </lead>
+ <lead>
+  <name>Timo Tijhof</name>
+  <user>krinkle</user>
+  <email>krinklemail@gmail.com</email>
+  <active>yes</active>
+ </lead>
  <date>2021-02-26</date>
  <version>
   <release>1.0.0</release>
