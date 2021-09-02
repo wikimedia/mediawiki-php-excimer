@@ -250,7 +250,7 @@ static void excimer_log_append_no_spaces(smart_str *dest, zend_string *src)
 	size_t i;
 	for (i = 0; i < ZSTR_LEN(src); i++) {
 		char c = ZSTR_VAL(src)[i];
-		if (c == ' ') {
+		if (c == ' ' || c == '\0') {
 			c = '_';
 		}
 		ZSTR_VAL(dest->s)[prev_len + i] = c;
