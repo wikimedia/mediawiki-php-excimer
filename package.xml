@@ -16,7 +16,7 @@
  <lead>
   <name>Kunal Mehta</name>
   <user>legoktm</user>
-  <email>legoktm@member.fsf.org</email>
+  <email>legoktm@debian.org</email>
   <active>yes</active>
  </lead>
  <lead>
@@ -25,10 +25,10 @@
   <email>krinklemail@gmail.com</email>
   <active>yes</active>
  </lead>
- <date>2021-02-26</date>
+ <date>2021-09-29</date>
  <version>
-  <release>1.0.0</release>
-  <api>1.0.0</api>
+  <release>1.0.1</release>
+  <api>1.0.1</api>
  </version>
  <stability>
   <release>stable</release>
@@ -36,7 +36,9 @@
  </stability>
  <license uri="https://www.apache.org/licenses/LICENSE-2.0" filesource="LICENSE">Apache 2.0</license>
  <notes>
-  - Initial PECL release
+  - Filter null bytes out of the collapsed output
+  - Fix segfault in ZTS mode
+  - Fix [-Wincompatible-pointer-types] with PHP 8
  </notes>
  <contents>
   <dir name="/">
@@ -83,5 +85,15 @@
  <providesextension>excimer</providesextension>
  <extsrcrelease />
  <changelog>
+    <release>
+      <date>2021-02-26</date>
+      <version>
+        <release>1.0.0</release>
+        <api>1.0.0</api>
+      </version>
+      <notes>
+        - Initial PECL release
+      </notes>
+    </release>
  </changelog>
 </package>
