@@ -565,6 +565,7 @@ static PHP_MINFO_FUNCTION(excimer)
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "excimer support", "enabled");
+	php_info_print_table_row(2, "excimer version", PHP_EXCIMER_VERSION);
 	php_info_print_table_end();
 }
 /* }}} */
