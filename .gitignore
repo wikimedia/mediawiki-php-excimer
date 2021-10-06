@@ -1,5 +1,6 @@
 # From PHP skeleton
 .deps
+*.dep
 *.lo
 *.la
 .libs
