@@ -25,10 +25,10 @@
   <email>krinklemail@gmail.com</email>
   <active>yes</active>
  </lead>
- <date>2021-09-29</date>
+ <date>2021-10-16</date>
  <version>
-  <release>1.0.1</release>
-  <api>1.0.1</api>
+  <release>1.0.2</release>
+  <api>1.0.2</api>
  </version>
  <stability>
   <release>stable</release>
@@ -36,9 +36,8 @@
  </stability>
  <license uri="https://www.apache.org/licenses/LICENSE-2.0" filesource="LICENSE">Apache 2.0</license>
  <notes>
-  - Filter null bytes out of the collapsed output
-  - Fix segfault in ZTS mode
-  - Fix [-Wincompatible-pointer-types] with PHP 8
+  - Fix Iterator prototypes for PHP 8.1
+  - Add extension version in phpinfo()
  </notes>
  <contents>
   <dir name="/">
@@ -85,6 +84,18 @@
  <providesextension>excimer</providesextension>
  <extsrcrelease />
  <changelog>
+    <release>
+      <date>2021-09-29</date>
+      <version>
+        <release>1.0.1</release>
+        <api>1.0.1</api>
+      </version>
+      <notes>
+        - Filter null bytes out of the collapsed output
+        - Fix segfault in ZTS mode
+        - Fix [-Wincompatible-pointer-types] with PHP 8
+      </notes>
+    </release>
     <release>
       <date>2021-02-26</date>
       <version>
