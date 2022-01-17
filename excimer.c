@@ -281,7 +281,7 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_formatCollapsed, 0)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_aggregateByFunction, 0)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO(arginfo_ExcimerLog_aggregateByFunction, IS_ARRAY, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_getEventCount, 0)
