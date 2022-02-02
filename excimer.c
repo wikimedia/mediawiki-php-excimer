@@ -269,7 +269,11 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerProfiler_stop, 0)
 ZEND_END_ARG_INFO()
 
+#if PHP_VERSION_ID >= 70200
+ZEND_BEGIN_ARG_WITH_RETURN_OBJ_INFO_EX(arginfo_ExcimerProfiler_getLog, 0, 0, ExcimerLog, 0)
+#else
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerProfiler_getLog, 0)
+#endif
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerProfiler_flush, 0)
