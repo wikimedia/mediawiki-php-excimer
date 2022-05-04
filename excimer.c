@@ -285,7 +285,11 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_formatCollapsed, 0)
 ZEND_END_ARG_INFO()
 
+#if PHP_VERSION_ID < 70200
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO(arginfo_ExcimerLog_aggregateByFunction, IS_ARRAY, NULL, 0)
+#else
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO(arginfo_ExcimerLog_aggregateByFunction, IS_ARRAY, 0)
+#endif
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_getEventCount, 0)
