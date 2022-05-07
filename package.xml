@@ -22,13 +22,13 @@
  <lead>
   <name>Timo Tijhof</name>
   <user>krinkle</user>
-  <email>krinklemail@gmail.com</email>
+  <email>krinkle@fastmail.com</email>
   <active>yes</active>
  </lead>
- <date>2022-05-04</date>
+ <date>2022-05-07</date>
  <version>
-  <release>1.0.3</release>
-  <api>1.0.3</api>
+  <release>1.0.4</release>
+  <api>1.0.4</api>
  </version>
  <stability>
   <release>stable</release>
@@ -36,8 +36,7 @@
  </stability>
  <license uri="https://www.apache.org/licenses/LICENSE-2.0" filesource="LICENSE">Apache 2.0</license>
  <notes>
-  - Set return type on ExcimerLog::aggregateByFunction
-  - Set return type on ExcimerProfiler::getLog
+  - Fix arginfo error for PHP 7.1
  </notes>
  <contents>
   <dir name="/">
@@ -84,6 +83,17 @@
  <providesextension>excimer</providesextension>
  <extsrcrelease />
  <changelog>
+   <release>
+    <date>2022-05-04</date>
+    <version>
+     <release>1.0.3</release>
+     <api>1.0.3</api>
+     </version>
+     <notes>
+      - Set return type on ExcimerLog::aggregateByFunction
+      - Set return type on ExcimerProfiler::getLog
+     </notes>
+    </release>
     <release>
      <date>2021-10-16</date>
      <version>
