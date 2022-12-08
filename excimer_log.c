@@ -263,35 +263,43 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 	zend_long entry_index;
 	zend_long frame_index;
 	zval *zp_count;
-	smart_str buf = {NULL};
-	HashTable ht_storage;
-	HashTable *ht;
+	zval z_count;
+	smart_str ss_out = {NULL};
+	HashTable frame_counts_storage, lines_storage;
+	HashTable *ht_frame_counts, *ht_lines;
 
-	ht = &ht_storage;
-	memset(ht, 0, sizeof(HashTable));
-	zend_hash_init(ht, 0, NULL, NULL, 0);
+	ht_frame_counts = &frame_counts_storage;
+	memset(ht_frame_counts, 0, sizeof(HashTable));
+	zend_hash_init(ht_frame_counts, 0, NULL, NULL, 0);
+
+	ht_lines = &lines_storage;
+	memset(ht_lines, 0, sizeof(HashTable));
+	zend_hash_init(ht_lines, 0, NULL, NULL, 0);
+
 	excimer_log_frame ** frame_ptrs = NULL;
 	size_t frames_capacity = 0;
+	zend_string *str_line;
 
 	/* Collate frame counts */
 	for (entry_index = 0; entry_index < log->entries_size; entry_index++) {
 		excimer_log_entry *entry = excimer_log_get_entry(log, entry_index);
-		zp_count = zend_hash_index_find(ht, entry->frame_index);
+		zp_count = zend_hash_index_find(ht_frame_counts, entry->frame_index);
 		if (!zp_count) {
-			zval z_count;
 			ZVAL_LONG(&z_count, 0);
-			zp_count = zend_hash_index_add(ht, entry->frame_index, &z_count);
+			zp_count = zend_hash_index_add(ht_frame_counts, entry->frame_index, &z_count);
 		}
 
 		Z_LVAL_P(zp_count) += entry->event_count;
 	}
 
-	/* Format traces */
-	ZEND_HASH_FOREACH_NUM_KEY_VAL(ht, frame_index, zp_count) {
+	/* Format traces, and deduplicate frames that differ only in hidden line numbers */
+	ZEND_HASH_FOREACH_NUM_KEY_VAL(ht_frame_counts, frame_index, zp_count) {
 		zend_long current_frame_index = frame_index;
 		zend_long num_frames = 0;
 		excimer_log_frame *frame;
 		zend_long i;
+		zend_bool line_start = 1; /* TODO use bool when PHP 7.4 support is dropped */
+		smart_str ss_line = {NULL};
 
 		/* Build the array of frame pointers */
 		while (current_frame_index) {
@@ -312,36 +320,52 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 		for (i = num_frames - 1; i >= 0; i--) {
 			frame = frame_ptrs[i];
 
-			if (excimer_log_smart_str_get_len(&buf) != 0) {
-				smart_str_appends(&buf, ";");
+			if (line_start) {
+				line_start = 0;
+			} else {
+				smart_str_appends(&ss_line, ";");
 			}
-
 			if (frame->closure_line != 0) {
 				/* Annotate anonymous functions with their source location.
 				 * Example: {closure:/path/to/file.php(123)}
 				 */
-				smart_str_appends(&buf, "{closure:");
-				excimer_log_append_no_spaces(&buf, frame->filename);
-				excimer_log_smart_str_append_printf(&buf, "(%d)}", frame->closure_line);
+				smart_str_appends(&ss_line, "{closure:");
+				excimer_log_append_no_spaces(&ss_line, frame->filename);
+				excimer_log_smart_str_append_printf(&ss_line, "(%d)}", frame->closure_line);
 			} else if (frame->function_name == NULL) {
 				/* For file-scope code, use the file name */
-				excimer_log_append_no_spaces(&buf, frame->filename);
+				excimer_log_append_no_spaces(&ss_line, frame->filename);
 			} else {
 				if (frame->class_name) {
-					excimer_log_append_no_spaces(&buf, frame->class_name);
-					smart_str_appends(&buf, "::");
+					excimer_log_append_no_spaces(&ss_line, frame->class_name);
+					smart_str_appends(&ss_line, "::");
 				}
-				excimer_log_append_no_spaces(&buf, frame->function_name);
+				excimer_log_append_no_spaces(&ss_line, frame->function_name);
 			}
 		}
 
-		/* Append count and line break */
-		excimer_log_smart_str_append_printf(&buf, " %ld\n", Z_LVAL_P(zp_count));
+		/* ht_lines[ss_line] += zp_count */
+		str_line = excimer_log_smart_str_extract(&ss_line);
+		zval *zp_line_count = zend_hash_find(ht_lines, str_line);
+		if (!zp_line_count) {
+			ZVAL_LONG(&z_count, 0);
+			zp_line_count = zend_hash_add(ht_lines, str_line, &z_count);
+		}
+		Z_LVAL_P(zp_line_count) += Z_LVAL_P(zp_count);
 	}
 	ZEND_HASH_FOREACH_END();
-	zend_hash_destroy(ht);
+
+	/* Concatenate lines */
+	ZEND_HASH_FOREACH_STR_KEY_VAL(ht_lines, str_line, zp_count) {
+		smart_str_append(&ss_out, str_line);
+		excimer_log_smart_str_append_printf(&ss_out, " %ld\n", Z_LVAL_P(zp_count));
+	}
+	ZEND_HASH_FOREACH_END();
+
+	zend_hash_destroy(ht_frame_counts);
+	zend_hash_destroy(ht_lines);
 	efree(frame_ptrs);
-	return excimer_log_smart_str_extract(&buf);
+	return excimer_log_smart_str_extract(&ss_out);
 }
 
 HashTable *excimer_log_frame_to_array(excimer_log_frame *frame) {
