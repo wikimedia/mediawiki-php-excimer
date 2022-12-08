@@ -46,7 +46,7 @@
 	excimer_object_alloc_init(sizeof(type ## _obj), &type ## _handlers, ce)
 
 #define EXCIMER_DEFAULT_PERIOD 0.1
-
+#define EXCIMER_BILLION 1000000000LL
 /* {{{ types */
 
 /**
@@ -188,6 +188,7 @@ static void ExcimerLog_iterator_invalidate_current(zend_object_iterator *iter);
 
 static PHP_METHOD(ExcimerLog, __construct);
 static PHP_METHOD(ExcimerLog, formatCollapsed);
+static PHP_METHOD(ExcimerLog, getSpeedscopeData);
 static PHP_METHOD(ExcimerLog, aggregateByFunction);
 static PHP_METHOD(ExcimerLog, getEventCount);
 static PHP_METHOD(ExcimerLog, current);
@@ -283,6 +284,9 @@ ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog___construct, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_formatCollapsed, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO(arginfo_ExcimerLog_getSpeedscopeData, 0)
 ZEND_END_ARG_INFO()
 
 #if PHP_VERSION_ID < 70200
@@ -392,6 +396,7 @@ static const zend_function_entry ExcimerLog_methods[] = {
 	PHP_ME(ExcimerLog, __construct, arginfo_ExcimerLog___construct,
 		ZEND_ACC_PRIVATE | ZEND_ACC_FINAL)
 	PHP_ME(ExcimerLog, formatCollapsed, arginfo_ExcimerLog_formatCollapsed, 0)
+	PHP_ME(ExcimerLog, getSpeedscopeData, arginfo_ExcimerLog_getSpeedscopeData, 0)
 	PHP_ME(ExcimerLog, aggregateByFunction, arginfo_ExcimerLog_aggregateByFunction, 0)
 	PHP_ME(ExcimerLog, getEventCount, arginfo_ExcimerLog_getEventCount, 0)
 	PHP_ME(ExcimerLog, current, arginfo_ExcimerLog_current, 0)
@@ -470,8 +475,8 @@ static void excimer_set_timespec(struct timespec *dest, double source) /* {{{ */
 	fractional = modf(source, &integral);
 	dest->tv_sec = (time_t)integral;
 	dest->tv_nsec = (long)(fractional * 1000000000.0);
-	if (dest->tv_nsec >= 1000000000L) {
-		dest->tv_nsec -= 1000000000L;
+	if (dest->tv_nsec >= EXCIMER_BILLION) {
+		dest->tv_nsec -= EXCIMER_BILLION;
 		dest->tv_sec ++;
 	}
 }
@@ -479,7 +484,7 @@ static void excimer_set_timespec(struct timespec *dest, double source) /* {{{ */
 
 static inline uint64_t excimer_timespec_to_ns(struct timespec *ts)
 {
-	return (uint64_t)ts->tv_nsec + (uint64_t)ts->tv_sec * 1000000000LL;
+	return (uint64_t)ts->tv_nsec + (uint64_t)ts->tv_sec * EXCIMER_BILLION;
 }
 
 static inline double excimer_timespec_to_double(struct timespec *ts)
@@ -599,6 +604,7 @@ static zend_object *ExcimerProfiler_new(zend_class_entry *ce) /* {{{ */
 	initial = php_mt_rand() * EXCIMER_DEFAULT_PERIOD / UINT32_MAX;
 	excimer_set_timespec(&profiler->initial, initial);
 	excimer_set_timespec(&profiler->period, EXCIMER_DEFAULT_PERIOD);
+	log_obj->log.period = EXCIMER_DEFAULT_PERIOD * EXCIMER_BILLION;
 
 	return &profiler->std;
 }
@@ -648,6 +654,9 @@ static PHP_METHOD(ExcimerProfiler, setPeriod)
 
 	excimer_set_timespec(&profiler->period, period);
 	excimer_set_timespec(&profiler->initial, initial);
+
+	ExcimerLog_obj *log = EXCIMER_OBJ_ZP(ExcimerLog, &profiler->z_log);
+	log->log.period = period * EXCIMER_BILLION;
 }
 /* }}} */
 
@@ -1050,6 +1059,15 @@ static PHP_METHOD(ExcimerLog, formatCollapsed)
 {
 	ExcimerLog_obj *log_obj = EXCIMER_OBJ_ZP(ExcimerLog, getThis());
 	RETURN_STR(excimer_log_format_collapsed(&log_obj->log));
+}
+/* }}} */
+
+/* {{{ proto string ExcimerLog::getSpeedscopeData()
+ */
+static PHP_METHOD(ExcimerLog, getSpeedscopeData)
+{
+	ExcimerLog_obj *log_obj = EXCIMER_OBJ_ZP(ExcimerLog, getThis());
+	excimer_log_get_speedscope_data(&log_obj->log, return_value);
 }
 /* }}} */
 

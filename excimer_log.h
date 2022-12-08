@@ -104,6 +104,11 @@ typedef struct _excimer_log {
 	uint64_t epoch;
 
 	/**
+	 * The nominal period in nanoseconds
+	 */
+	uint64_t period;
+
+	/**
 	 * The sum of the event counts of all contained log entries
 	 */
 	zend_long event_count;
@@ -184,6 +189,14 @@ excimer_log_frame *excimer_log_get_frame(excimer_log *log, zend_long i);
  * @return A new zend_string owned by the caller
  */
 zend_string *excimer_log_format_collapsed(excimer_log *log);
+
+/**
+ * Get an array in speedscope format
+ *
+ * @param log The log object
+ * @param zp_data The destination
+ */
+void excimer_log_get_speedscope_data(excimer_log *log, zval *zp_data);
 
 /**
  * Aggregate the log producing self/inclusive statistics as an array

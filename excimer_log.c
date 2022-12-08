@@ -30,7 +30,7 @@ static uint32_t excimer_log_find_or_add_frame(excimer_log *log,
 static inline HashTable *excimer_log_new_array(uint32_t nSize)
 {
 	HashTable *ht = emalloc(sizeof(HashTable));
-	zend_hash_init(ht, 0, NULL, ZVAL_PTR_DTOR, 0);
+	zend_hash_init(ht, nSize, NULL, ZVAL_PTR_DTOR, 0);
 	return ht;
 }
 #endif
@@ -73,6 +73,17 @@ static void excimer_log_smart_str_append_printf(smart_str *dest, const char *for
 	efree(buf);
 }
 #define excimer_log_known_string(index) CG(known_strings)[index]
+#endif
+
+#if PHP_VERSION_ID >= 80100
+#define excimer_log_add_assoc_array add_assoc_array
+#else
+static inline void excimer_log_add_assoc_array(zval *dest, const char *key, HashTable *arr)
+{
+	zval z_tmp;
+	ZVAL_ARR(&z_tmp, arr);
+	add_assoc_zval(dest, key, &z_tmp);
+}
 #endif
 
 /* }}} */
@@ -121,6 +132,7 @@ void excimer_log_copy_options(excimer_log *dest, excimer_log  *src)
 {
 	dest->max_depth = src->max_depth;
 	dest->epoch = src->epoch;
+	dest->period = src->period;
 }
 
 void excimer_log_add(excimer_log *log, zend_execute_data *execute_data,
@@ -258,6 +270,26 @@ static void excimer_log_append_no_spaces(smart_str *dest, zend_string *src)
 	ZSTR_LEN(dest->s) = new_len;
 }
 
+static void excimer_log_append_frame_name(smart_str *ss, excimer_log_frame *frame) {
+	if (frame->closure_line != 0) {
+		/* Annotate anonymous functions with their source location.
+		 * Example: {closure:/path/to/file.php(123)}
+		 */
+		smart_str_appends(ss, "{closure:");
+		excimer_log_append_no_spaces(ss, frame->filename);
+		excimer_log_smart_str_append_printf(ss, "(%d)}", frame->closure_line);
+	} else if (frame->function_name == NULL) {
+		/* For file-scope code, use the file name */
+		excimer_log_append_no_spaces(ss, frame->filename);
+	} else {
+		if (frame->class_name) {
+			excimer_log_append_no_spaces(ss, frame->class_name);
+			smart_str_appends(ss, "::");
+		}
+		excimer_log_append_no_spaces(ss, frame->function_name);
+	}
+}
+
 zend_string *excimer_log_format_collapsed(excimer_log *log)
 {
 	zend_long entry_index;
@@ -298,7 +330,7 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 		zend_long num_frames = 0;
 		excimer_log_frame *frame;
 		zend_long i;
-		zend_bool line_start = 1; /* TODO use bool when PHP 7.4 support is dropped */
+		int line_start = 1; /* TODO use bool when PHP 7.4 support is dropped */
 		smart_str ss_line = {NULL};
 
 		/* Build the array of frame pointers */
@@ -325,23 +357,7 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 			} else {
 				smart_str_appends(&ss_line, ";");
 			}
-			if (frame->closure_line != 0) {
-				/* Annotate anonymous functions with their source location.
-				 * Example: {closure:/path/to/file.php(123)}
-				 */
-				smart_str_appends(&ss_line, "{closure:");
-				excimer_log_append_no_spaces(&ss_line, frame->filename);
-				excimer_log_smart_str_append_printf(&ss_line, "(%d)}", frame->closure_line);
-			} else if (frame->function_name == NULL) {
-				/* For file-scope code, use the file name */
-				excimer_log_append_no_spaces(&ss_line, frame->filename);
-			} else {
-				if (frame->class_name) {
-					excimer_log_append_no_spaces(&ss_line, frame->class_name);
-					smart_str_appends(&ss_line, "::");
-				}
-				excimer_log_append_no_spaces(&ss_line, frame->function_name);
-			}
+			excimer_log_append_frame_name(&ss_line, frame);
 		}
 
 		/* ht_lines[ss_line] += zp_count */
@@ -366,6 +382,140 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 	zend_hash_destroy(ht_lines);
 	efree(frame_ptrs);
 	return excimer_log_smart_str_extract(&ss_out);
+}
+
+static HashTable *excimer_log_frame_to_speedscope_array(excimer_log_frame *frame) {
+	HashTable *ht_func = excimer_log_new_array(0);
+	zval tmp;
+	smart_str ss_name = {NULL};
+	
+	excimer_log_append_frame_name(&ss_name, frame);
+	ZVAL_STR(&tmp, excimer_log_smart_str_extract(&ss_name));
+	zend_hash_str_add(ht_func, "name", sizeof("name")-1, &tmp);
+
+	if (frame->filename) {
+		ZVAL_STR_COPY(&tmp, frame->filename);
+		zend_hash_add_new(ht_func, excimer_log_known_string(ZEND_STR_FILE), &tmp);
+		/* Don't include the line number since it causes speedscope to split functions */
+	}
+	return ht_func;
+}
+
+static zend_string *excimer_log_get_speedscope_frame_key(excimer_log_frame *frame) {
+	smart_str ss = {NULL};
+	
+	excimer_log_append_frame_name(&ss, frame);
+	smart_str_appendc(&ss, '\0');
+	smart_str_append(&ss, frame->filename);
+	return excimer_log_smart_str_extract(&ss);
+}
+
+static uint32_t excimer_log_count_frames(excimer_log *log, uint32_t frame_index) {
+	uint32_t n = 0;
+	while (frame_index) {
+		n++;
+		frame_index = log->frames[frame_index].prev_index;
+	}
+	return n;
+}
+
+void excimer_log_get_speedscope_data(excimer_log *log, zval *zp_data) {
+	array_init(zp_data);
+	add_assoc_string(zp_data, "$schema", "https://www.speedscope.app/file-format-schema.json");
+	add_assoc_string(zp_data, "exporter", "Excimer");
+
+	HashTable *ht_frames = excimer_log_new_array(0);
+	HashTable *ht_indexes_by_key = excimer_log_new_array(0);
+	zend_long *lp_frame_indexes = ecalloc(log->frames_size, sizeof(zend_long));
+	zend_long i;
+	zval *zp_frame_index;
+	zend_string *str_key;
+	zval z_tmp, *zp_tmp;
+
+	/* Build the frames array */
+	for (i = 1; i < log->frames_size; i++) {
+		zend_long index;
+		excimer_log_frame *frame = &log->frames[i];
+		str_key = excimer_log_get_speedscope_frame_key(frame);
+		zp_frame_index = zend_hash_find(ht_indexes_by_key, str_key);
+		if (!zp_frame_index) {
+			/* Add the frame to ht_frames */
+			index = zend_hash_num_elements(ht_frames);
+			ZVAL_ARR(&z_tmp, excimer_log_frame_to_speedscope_array(frame));
+			zend_hash_next_index_insert_new(ht_frames, &z_tmp);
+			/* Add the frame index to ht_indexes_by_key */
+			ZVAL_LONG(&z_tmp, index);
+			zp_frame_index = zend_hash_add_new(ht_indexes_by_key, str_key, &z_tmp);
+		}
+		lp_frame_indexes[i] = Z_LVAL_P(zp_frame_index);
+	}
+
+	/* zp_data["shared"] = ["frames" => ht_frames] */
+	zval z_shared;
+	array_init(&z_shared);
+	excimer_log_add_assoc_array(&z_shared, "frames", ht_frames);
+	add_assoc_zval(zp_data, "shared", &z_shared);
+
+	/* Build the samples and weights arrays */
+	HashTable *ht_samples = excimer_log_new_array(log->entries_size);
+	HashTable *ht_weights = excimer_log_new_array(log->entries_size);
+	uint64_t first_timestamp = 0;
+	uint64_t last_timestamp = 0;
+	for (i = 0; i < log->entries_size; i++) {
+		excimer_log_entry *entry = &log->entries[i];
+		uint32_t frame_index = entry->frame_index;
+
+		if (i == 0) {
+			first_timestamp = entry->timestamp;
+		}
+		last_timestamp = entry->timestamp;
+
+		uint32_t num_frames = excimer_log_count_frames(log, frame_index);
+		uint32_t j;
+
+		/* Create the array with ZEND_HASH_FILL_PACKED. This is just a fast way
+		 * to get it into the right state, with num_frames elements. */
+		HashTable *ht_stack = excimer_log_new_array(num_frames);
+		zend_hash_extend(ht_stack, num_frames, 1);
+		ZEND_HASH_FILL_PACKED(ht_stack) {
+			for (j = 0; j < num_frames; j++) {
+				ZEND_HASH_FILL_SET_LONG(0);
+				ZEND_HASH_FILL_NEXT();
+			}
+		} ZEND_HASH_FILL_END();
+
+		/* Write the values in reverse order */
+		ZEND_HASH_REVERSE_FOREACH_VAL(ht_stack, zp_tmp) {
+			ZVAL_LONG(zp_tmp, lp_frame_indexes[frame_index]);
+			frame_index = log->frames[frame_index].prev_index;
+		}
+		ZEND_HASH_FOREACH_END();
+
+		ZVAL_ARR(&z_tmp, ht_stack);
+		zend_hash_next_index_insert_new(ht_samples, &z_tmp);
+
+		ZVAL_LONG(&z_tmp, entry->event_count * log->period);
+		zend_hash_next_index_insert_new(ht_weights, &z_tmp);
+	}
+
+	/* Build the profile array */
+	zval z_profile;
+	array_init(&z_profile);
+	add_assoc_string(&z_profile, "type", "sampled");
+	add_assoc_string(&z_profile, "name", "");
+	add_assoc_string(&z_profile, "unit", "nanoseconds");
+	add_assoc_long(&z_profile, "startValue", 0);
+	add_assoc_long(&z_profile, "endValue", last_timestamp - first_timestamp);
+	excimer_log_add_assoc_array(&z_profile, "samples", ht_samples);
+	excimer_log_add_assoc_array(&z_profile, "weights", ht_weights);
+
+	/* zp_data["profiles"] = [profile] */
+	zval z_profiles;
+	array_init(&z_profiles);
+	add_next_index_zval(&z_profiles, &z_profile);
+	add_assoc_zval(zp_data, "profiles", &z_profiles);
+
+	efree(lp_frame_indexes);
 }
 
 HashTable *excimer_log_frame_to_array(excimer_log_frame *frame) {

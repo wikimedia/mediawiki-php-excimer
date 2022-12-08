@@ -65,6 +65,14 @@ class ExcimerLog implements ArrayAccess, Iterator {
 	}
 
 	/**
+	 * Get an array which can be JSON encoded for import into speedscope
+	 *
+	 * @return array
+	 */
+	function getSpeedscopeData() {
+	}
+
+	/**
 	 * Get the total number of profiling periods represented by this log.
 	 *
 	 * @return int

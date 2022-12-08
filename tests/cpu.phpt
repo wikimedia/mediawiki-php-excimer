@@ -84,6 +84,51 @@ check_collapsed($collapsed, 'closure1', "!cpu.php;foo;bar;{closure:.*\($c1line\)
 check_collapsed($collapsed, 'closure2', "!cpu.php;foo;bar;{closure:.*\($c2line\)} \d+$!m");
 check_collapsed($collapsed, 'member', '!cpu.php;foo;bar;C::member \d+$!m');
 
+// Test getSpeedscopeData
+function check_speedscope($speedscope, $name, $expected) {
+	$ok = false;
+	foreach ($speedscope['profiles'][0]['samples'] as $sample) {
+		if (count($sample) !== count($expected)) {
+			break;
+		}
+		$matches = 0;
+		foreach ($expected as $i => $expectedFrame) {
+			if (!isset($sample[$i])) {
+				break;
+			}
+			$frame = $speedscope['shared']['frames'][$sample[$i]];
+			if ($frame === $expectedFrame) {
+				$matches++;
+			} else {
+				break;
+			}
+		}
+		if ($matches === count($expected)) {
+			$ok = true;
+			break;
+		}
+	}
+	echo "getSpeedscopeData $name: " . ($ok ? "OK\n" : "FAILED\n");
+	if (!$ok) {
+		echo "Expected: ";
+		var_dump($expected);
+		echo "Actual: ";
+		var_dump($speedscope);
+	}
+}
+
+$speedscope = $log->getSpeedscopeData();
+check_speedscope(
+	$speedscope,
+	'baz',
+	[
+		['name' => __FILE__, 'file' => __FILE__],
+		['name' => 'foo', 'file' => __FILE__],
+		['name' => 'bar', 'file' => __FILE__],
+		['name' => 'baz', 'file' => __FILE__]
+	]
+);
+
 // Test foreach (get_iterator handler)
 $found = [];
 $count = 0;
@@ -204,6 +249,7 @@ formatCollapsed baz: OK
 formatCollapsed closure1: OK
 formatCollapsed closure2: OK
 formatCollapsed member: OK
+getSpeedscopeData baz: OK
 foreach found baz: OK
 foreach found closure1: OK
 foreach found closure2: OK
