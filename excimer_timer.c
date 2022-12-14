@@ -22,6 +22,12 @@
 #include "php.h"
 #include "excimer_timer.h"
 
+#if PHP_VERSION_ID >= 80200
+#define excimer_timer_atomic_bool_store(dest, value) zend_atomic_bool_store(dest, value)
+#else
+#define excimer_timer_atomic_bool_store(dest, value) *dest = value
+#endif
+
 excimer_timer_globals_t excimer_timer_globals;
 ZEND_TLS excimer_timer_tls_t excimer_timer_tls;
 
@@ -292,7 +298,7 @@ static void excimer_timer_handle(union sigval sv)
 	} else {
 		Z_LVAL_P(zp_event_count) += event_count;
 	}
-	*timer->vm_interrupt_ptr = 1;
+	excimer_timer_atomic_bool_store(timer->vm_interrupt_ptr, 1);
 	/* Release the mutexes */
 	excimer_mutex_unlock(timer->thread_mutex_ptr);
 	excimer_mutex_unlock(&excimer_timer_globals.mutex);

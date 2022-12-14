@@ -33,7 +33,11 @@ typedef struct _excimer_timer {
 	int is_running;
 
 	/** &EG(vm_interrupt) in the relevant thread */
+#if PHP_VERSION_ID >= 80200
+	zend_atomic_bool *vm_interrupt_ptr;
+#else
 	zend_bool *vm_interrupt_ptr;
+#endif
 
 	/** A unique ID identifying this object. These IDs are never reused, so that
 	 * the ID can be used to identify events received for deleted objects. The
