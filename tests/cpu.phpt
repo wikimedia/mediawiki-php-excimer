@@ -10,10 +10,10 @@ zend.assertions=1
 function getClosures() {
 	return [
 		function () {
-			return md5(str_repeat('x', 100000));
+			return md5(str_repeat('x', 100000)); # line 5
 		},
 		function () {
-			return md5(str_repeat('x', 100000));
+			return md5(str_repeat('x', 100000)); # line 8
 		}
 	];
 };
@@ -66,23 +66,22 @@ while (cpu() - $t < 3) {
 $profiler->stop();
 $log = $profiler->flush();
 
+function sort_lines($text) {
+	$lines = explode("\n", trim($text));
+	sort($lines);
+	return implode("\n", $lines);
+}
+
 // It takes 3 seconds to populate the profiler log, which is quite expensive,
 // so we do as many tests as possible on the result while we have it.
 
 // Test formatCollapsed
-function check_collapsed($collapsed, $name, $search) {
-	if (preg_match($search, $collapsed)) {
-		echo "formatCollapsed $name: OK\n";
-	} else {
-		echo "formatCollapsed $name: FAILED\n";
-	}
-}
-
 $collapsed = $log->formatCollapsed();
-check_collapsed($collapsed, 'baz', '!cpu.php;foo;bar;baz \d+$!m');
-check_collapsed($collapsed, 'closure1', "!cpu.php;foo;bar;{closure:.*\($c1line\)} \d+$!m");
-check_collapsed($collapsed, 'closure2', "!cpu.php;foo;bar;{closure:.*\($c2line\)} \d+$!m");
-check_collapsed($collapsed, 'member', '!cpu.php;foo;bar;C::member \d+$!m');
+// Normalize variable file path, and sample count
+$collapsed = str_replace(__FILE__, '/data/cpu.php', $collapsed);
+$collapsed = preg_replace('/ \d+$/m', ' 00', $collapsed);
+$collapsed = sort_lines($collapsed);
+echo "formatCollapsed:\n$collapsed\n\n";
 
 // Test getSpeedscopeData
 function check_speedscope($speedscope, $name, $expected) {
@@ -245,10 +244,12 @@ rsort( $sortedCounts );
 assert( $sortedCounts === $counts );
 
 --EXPECT--
-formatCollapsed baz: OK
-formatCollapsed closure1: OK
-formatCollapsed closure2: OK
-formatCollapsed member: OK
+formatCollapsed:
+/data/cpu.php;foo;bar;C::member 00
+/data/cpu.php;foo;bar;baz 00
+/data/cpu.php;foo;bar;{closure:/data/cpu.php(5)} 00
+/data/cpu.php;foo;bar;{closure:/data/cpu.php(8)} 00
+
 getSpeedscopeData baz: OK
 foreach found baz: OK
 foreach found closure1: OK
