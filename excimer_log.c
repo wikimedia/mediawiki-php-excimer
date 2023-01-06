@@ -18,6 +18,8 @@
 #include "php_excimer.h"
 #include "excimer_log.h"
 
+static const char excimer_log_truncated_name[] = "excimer_truncated";
+static const char excimer_log_fake_filename[] = "excimer fake file";
 
 static uint32_t excimer_log_find_or_add_frame(excimer_log *log,
 		zend_execute_data *execute_data, zend_long depth);
@@ -150,19 +152,50 @@ void excimer_log_add(excimer_log *log, zend_execute_data *execute_data,
 	entry->timestamp = timestamp;
 }
 
+static uint32_t excimer_log_get_truncation_marker(excimer_log *log) {
+	zval* zp_index;
+	zval z_new_index;
+	excimer_log_frame *p_frame;
+	
+	zp_index = zend_hash_str_find(log->reverse_frames,
+		excimer_log_truncated_name, sizeof(excimer_log_truncated_name) - 1);
+	if (zp_index) {
+		return excimer_safe_uint32(Z_LVAL_P(zp_index));
+	}
+
+	ZVAL_LONG(&z_new_index, log->frames_size);
+	zend_hash_str_add(log->reverse_frames,
+		excimer_log_truncated_name, sizeof(excimer_log_truncated_name) - 1,
+		&z_new_index);
+	log->frames = safe_erealloc(log->frames, log->frames_size + 1,
+		sizeof(excimer_log_frame), 0);
+	p_frame = &log->frames[log->frames_size++];
+
+	p_frame->filename = zend_string_init(excimer_log_fake_filename,
+		sizeof(excimer_log_fake_filename) - 1, 0);
+	p_frame->lineno = 1;
+	p_frame->closure_line = 0;
+	p_frame->class_name = NULL;
+	p_frame->function_name = zend_string_init(excimer_log_truncated_name,
+		sizeof(excimer_log_truncated_name) - 1, 0);
+	p_frame->prev_index = 0;
+
+	return excimer_safe_uint32(Z_LVAL(z_new_index));
+}
+
 static uint32_t excimer_log_find_or_add_frame(excimer_log *log,
 	zend_execute_data *execute_data, zend_long depth)
 {
 	uint32_t prev_index;
 	if (!execute_data) {
 		return 0;
-	} else if (execute_data->prev_execute_data
-		&& (!log->max_depth || depth < log->max_depth))
-	{
+	} else if (!execute_data->prev_execute_data) {
+		prev_index = 0;
+	} else if (log->max_depth && depth >= log->max_depth) {
+		prev_index = excimer_log_get_truncation_marker(log);
+	} else {
 		prev_index = excimer_log_find_or_add_frame(log,
 			execute_data->prev_execute_data, depth + 1);
-	} else {
-		prev_index = 0;
 	}
 	if (!execute_data->func
 		|| !ZEND_USER_CODE(execute_data->func->common.type))

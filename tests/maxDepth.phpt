@@ -28,4 +28,4 @@ $log = $profiler->flush();
 echo $log->formatCollapsed() . "\n";
 
 --EXPECTF--
-foo;foo;foo;foo;foo;foo %d
+excimer_truncated;foo;foo;foo;foo;foo;foo %d
