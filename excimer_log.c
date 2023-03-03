@@ -511,10 +511,19 @@ void excimer_log_get_speedscope_data(excimer_log *log, zval *zp_data) {
 		HashTable *ht_stack = excimer_log_new_array(num_frames);
 		zend_hash_extend(ht_stack, num_frames, 1);
 		ZEND_HASH_FILL_PACKED(ht_stack) {
+#if PHP_VERSION_ID < 70400
+			zval new_val;
+
+			ZVAL_LONG(&new_val, 0);
+			for (j = 0; j < num_frames; j++) {
+				ZEND_HASH_FILL_ADD(&new_val);
+			}
+#else
 			for (j = 0; j < num_frames; j++) {
 				ZEND_HASH_FILL_SET_LONG(0);
 				ZEND_HASH_FILL_NEXT();
 			}
+#endif
 		} ZEND_HASH_FILL_END();
 
 		/* Write the values in reverse order */
