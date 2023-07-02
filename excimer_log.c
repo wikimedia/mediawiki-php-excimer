@@ -231,9 +231,9 @@ static uint32_t excimer_log_find_or_add_frame(excimer_log *log,
 		/* Make a key for reverse lookup */
 		smart_str_append(&ss_key, frame.filename);
 		smart_str_appendc(&ss_key, '\0');
-		excimer_log_smart_str_append_printf(&ss_key, "%d", frame.lineno);
+		smart_str_append_long(&ss_key, frame.lineno);
 		smart_str_appendc(&ss_key, '\0');
-		excimer_log_smart_str_append_printf(&ss_key, "%d", frame.prev_index);
+		smart_str_append_long(&ss_key, frame.prev_index);
 		str_key = excimer_log_smart_str_extract(&ss_key);
 
 		/* Look for a matching frame in the reverse hashtable */
@@ -388,7 +388,7 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 			if (line_start) {
 				line_start = 0;
 			} else {
-				smart_str_appends(&ss_line, ";");
+				smart_str_appendc(&ss_line, ';');
 			}
 			excimer_log_append_frame_name(&ss_line, frame);
 		}
@@ -480,8 +480,12 @@ void excimer_log_get_speedscope_data(excimer_log *log, zval *zp_data) {
 			ZVAL_LONG(&z_tmp, index);
 			zp_frame_index = zend_hash_add_new(ht_indexes_by_key, str_key, &z_tmp);
 		}
+		zend_string_release(str_key);
 		lp_frame_indexes[i] = Z_LVAL_P(zp_frame_index);
 	}
+
+	zend_hash_destroy(ht_indexes_by_key);
+	efree(ht_indexes_by_key);
 
 	/* zp_data["shared"] = ["frames" => ht_frames] */
 	zval z_shared;
