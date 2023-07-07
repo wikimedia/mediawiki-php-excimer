@@ -17,7 +17,9 @@ function foo( $depth ) {
 		foo( $depth - 1 );
 	} else {
 		$profiler->start();
-		usleep(100000);
+		while (!count($profiler->getLog())) {
+			usleep(10000);
+		}
 		$profiler->stop();
 	}
 }

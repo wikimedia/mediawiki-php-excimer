@@ -1,5 +1,7 @@
 --TEST--
 ExcimerTimer periodic mode
+--SKIPIF--
+<?php if (!extension_loaded("excimer")) print "skip"; ?>
 --FILE--
 <?php
 $timer = new ExcimerTimer;

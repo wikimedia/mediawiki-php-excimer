@@ -46,18 +46,12 @@ function baz() {
 	return md5(str_repeat('x', 100000));
 }
 
-function cpu() {
-	$r = getrusage();
-	return $r['ru_utime.tv_sec'] + 1e-6 * $r['ru_utime.tv_usec'];
-}
-
 $profiler = new ExcimerProfiler;
 $profiler->setEventType(EXCIMER_CPU);
 $profiler->setPeriod(0.1);
-$t = cpu();
 $profiler->start();
 
-while (cpu() - $t < 3) {
+while (count($profiler->getLog()) < 30) {
 	for ($i = 0; $i < 100; $i++) {
 		foo();
 	}
