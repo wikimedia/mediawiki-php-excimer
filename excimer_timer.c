@@ -13,14 +13,17 @@
  * limitations under the License.
  */
 
-#include <time.h>
 #include <signal.h>
+#include <stdint.h>
+#include <time.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "php.h"
+#include "excimer_mutex.h"
 #include "excimer_timer.h"
+#include "zend_types.h"
 
 #if PHP_VERSION_ID >= 80200
 #define excimer_timer_atomic_bool_store(dest, value) zend_atomic_bool_store(dest, value)
@@ -37,40 +40,6 @@ static void excimer_timer_interrupt(zend_execute_data *execute_data);
 static inline int excimer_timer_is_zero(struct timespec *ts)
 {
 	return ts->tv_sec == 0 && ts->tv_nsec == 0;
-}
-
-static void excimer_mutex_init(pthread_mutex_t *mutex)
-{
-	int result = pthread_mutex_init(mutex, NULL);
-	if (result != 0) {
-		zend_error_noreturn(E_ERROR, "pthread_mutex_init(): %s", strerror(result));
-	}
-}
-
-static void excimer_mutex_lock(pthread_mutex_t *mutex)
-{
-	int result = pthread_mutex_lock(mutex);
-	if (result != 0) {
-		fprintf(stderr, "pthread_mutex_lock(): %s", strerror(result));
-		abort();
-	}
-}
-
-static void excimer_mutex_unlock(pthread_mutex_t *mutex)
-{
-	int result = pthread_mutex_unlock(mutex);
-	if (result != 0) {
-		fprintf(stderr, "pthread_mutex_unlock(): %s", strerror(result));
-		abort();
-	}
-}
-
-static void excimer_mutex_destroy(pthread_mutex_t *mutex)
-{
-	int result = pthread_mutex_destroy(mutex);
-	if (result != 0) {
-		zend_error_noreturn(E_ERROR, "pthread_mutex_destroy(): %s", strerror(result));
-	}
 }
 
 void excimer_timer_module_init()
@@ -138,7 +107,6 @@ int excimer_timer_init(excimer_timer *timer, int event_type,
 	excimer_timer_callback callback, void *user_data)
 {
 	zval z_timer;
-	struct sigevent ev;
 
 	memset(timer, 0, sizeof(excimer_timer));
 	ZVAL_PTR(&z_timer, timer);
@@ -161,24 +129,7 @@ int excimer_timer_init(excimer_timer *timer, int event_type,
 
 	zend_hash_index_add(excimer_timer_tls.timers_by_id, timer->id, &z_timer);
 
-	memset(&ev, 0, sizeof(ev));
-	ev.sigev_notify = SIGEV_THREAD;
-	ev.sigev_notify_function = excimer_timer_handle;
-	ev.sigev_value.sival_ptr = (void*)timer->id;
-
-	if (event_type == EXCIMER_CPU) {
-		if (pthread_getcpuclockid(pthread_self(), &timer->clock_id) != 0) {
-			php_error_docref(NULL, E_WARNING, "Unable to get thread clock ID: %s",
-				strerror(errno));
-			return FAILURE;
-		}
-	} else {
-		timer->clock_id = CLOCK_MONOTONIC;
-	}
-
-	if (timer_create(timer->clock_id, &ev, &timer->timer_id) != 0) {
-		php_error_docref(NULL, E_WARNING, "Unable to create timer: %s",
-			strerror(errno));
+	if (excimer_os_timer_create(event_type, timer->id, &timer->os_timer, &excimer_timer_handle) == FAILURE) {
 		return FAILURE;
 	}
 
@@ -190,10 +141,6 @@ int excimer_timer_init(excimer_timer *timer, int event_type,
 void excimer_timer_start(excimer_timer *timer,
 	struct timespec *period, struct timespec *initial)
 {
-	struct itimerspec its;
-	its.it_interval = *period;
-	its.it_value = *initial;
-
 	if (!timer->is_valid) {
 		php_error_docref(NULL, E_WARNING, "Unable to start uninitialised timer" );
 		return;
@@ -202,27 +149,22 @@ void excimer_timer_start(excimer_timer *timer,
 	/* If a periodic timer has an initial value of 0, use the period instead,
 	 * since it_value=0 means disarmed */
 	if (excimer_timer_is_zero(initial)) {
-		its.it_value = *period;
+		initial = period;
 	}
 	/* If the value is still zero, flag an error */
-	if (excimer_timer_is_zero(&its.it_value)) {
+	if (excimer_timer_is_zero(initial)) {
 		php_error_docref(NULL, E_WARNING, "Unable to start timer with a value of zero "
 			"duration and period");
 		return;
 	}
 
-	if (timer_settime(timer->timer_id, 0, &its, NULL) == 0) {
+	if (excimer_os_timer_start(&timer->os_timer, period, initial) == SUCCESS) {
 		timer->is_running = 1;
-	} else {
-		php_error_docref(NULL, E_WARNING, "timer_settime(): %s", strerror(errno));
 	}
 }
 
 void excimer_timer_destroy(excimer_timer *timer)
 {
-	struct timespec zero = {0, 0};
-	struct itimerspec its;
-
 	if (!timer->is_valid) {
 		/* This could happen if the timer is manually destroyed after
 		 * excimer_timer_thread_shutdown() is called */
@@ -238,12 +180,7 @@ void excimer_timer_destroy(excimer_timer *timer)
 	if (timer->is_running) {
 		timer->is_running = 0;
 
-		its.it_value = zero;
-		its.it_interval = zero;
-		if (timer_settime(timer->timer_id, 0, &its, NULL) != 0) {
-			php_error_docref(NULL, E_WARNING,
-				"timer_settime(): %s", strerror(errno));
-		}
+		excimer_os_timer_stop(&timer->os_timer);
 	}
 
 	/* Wait for the handler to finish if it is running */
@@ -262,10 +199,7 @@ void excimer_timer_destroy(excimer_timer *timer)
 	zend_hash_index_del(excimer_timer_tls.timers_by_id, timer->id);
 	excimer_mutex_unlock(&excimer_timer_tls.mutex);
 
-	if (timer_delete(timer->timer_id) != SUCCESS) {
-		php_error_docref(NULL, E_WARNING, "timer_delete(): %s",
-			strerror(errno));
-	}
+	excimer_os_timer_delete(&timer->os_timer);
 }
 
 static void excimer_timer_handle(union sigval sv)
@@ -278,7 +212,6 @@ static void excimer_timer_handle(union sigval sv)
 	/* Acquire the global mutex, which protects timers_by_id */
 	excimer_mutex_lock(&excimer_timer_globals.mutex);
 	timer = (excimer_timer*)zend_hash_index_find_ptr(excimer_timer_globals.timers_by_id, id);
-
 	if (!timer || !timer->is_running) {
 		/* Timer has been deleted, ignore event */
 		excimer_mutex_unlock(&excimer_timer_globals.mutex);
@@ -289,7 +222,7 @@ static void excimer_timer_handle(union sigval sv)
 	excimer_mutex_lock(timer->thread_mutex_ptr);
 
 	/* Add the event count to the thread-local hashtable */
-	event_count = timer_getoverrun(timer->timer_id) + 1;
+	event_count = excimer_os_timer_get_overrun_count(&timer->os_timer) + 1;
 	zp_event_count = zend_hash_index_find(*timer->event_counts_ptr, id);
 	if (!zp_event_count) {
 		zval tmp;
@@ -336,15 +269,11 @@ static void excimer_timer_interrupt(zend_execute_data *execute_data)
 
 void excimer_timer_get_time(excimer_timer *timer, struct timespec *remaining)
 {
-	struct itimerspec its;
-
 	if (!timer->is_valid || !timer->is_running) {
 		remaining->tv_sec = 0;
 		remaining->tv_nsec = 0;
 		return;
 	}
 
-	timer_gettime(timer->timer_id, &its);
-	remaining->tv_sec = its.it_value.tv_sec;
-	remaining->tv_nsec = its.it_value.tv_nsec;
+	excimer_os_timer_get_time(&timer->os_timer, remaining);
 }

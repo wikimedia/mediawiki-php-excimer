@@ -1,7 +1,10 @@
 --TEST--
 ExcimerProfiler CPU profile
 --SKIPIF--
-<?php if (!extension_loaded("excimer")) print "skip"; ?>
+<?php
+if (!extension_loaded("excimer")) print "skip";
+if (!defined("EXCIMER_CPU")) print "skip CPU profiling not supported";
+?>
 --INI--
 zend.assertions=1
 --FILE--

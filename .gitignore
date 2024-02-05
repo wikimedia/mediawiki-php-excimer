@@ -29,12 +29,12 @@ missing
 mkinstalldirs
 modules
 run-tests.php
-tests/*/*.diff
-tests/*/*.out
-tests/*/*.php
-tests/*/*.exp
-tests/*/*.log
-tests/*/*.sh
+tests/**/*.diff
+tests/**/*.out
+tests/**/*.php
+tests/**/*.exp
+tests/**/*.log
+tests/**/*.sh
 
 # From MediaWiki
 *.kate-swp
@@ -52,3 +52,7 @@ cscope.out
 .settings
 .DS_Store
 Thumbs.db
+
+# clang compilation database and cache
+.cache/
+compile_commands.json

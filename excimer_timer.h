@@ -16,12 +16,8 @@
 #ifndef EXCIMER_TIMER_H
 #define EXCIMER_TIMER_H
 
-enum {
-	/** Event type: real, wall-clock time */
-	EXCIMER_REAL,
-	/** Event type: CPU time */
-	EXCIMER_CPU
-};
+#include "excimer_events.h"
+#include "excimer_os_timer.h"
 
 typedef void (*excimer_timer_callback)(zend_long, void *);
 
@@ -49,11 +45,8 @@ typedef struct _excimer_timer {
 	 */
 	intptr_t id;
 
-	/** The clock ID passed to timer_create() etc. */
-	clockid_t clock_id;
-
-	/** The timer ID returned by timer_create() */
-	timer_t timer_id;
+	/** The timer returned by excimer_os_timer_create() */
+	excimer_os_timer_t os_timer;
 
 	/** The event callback. */
 	excimer_timer_callback callback;

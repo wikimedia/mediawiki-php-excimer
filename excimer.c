@@ -508,7 +508,13 @@ static PHP_MINIT_FUNCTION(excimer)
 	zend_class_entry ce;
 
 	REGISTER_LONG_CONSTANT("EXCIMER_REAL", EXCIMER_REAL, CONST_CS | CONST_PERSISTENT);
+
+	// Only define EXCIMER_CPU if the current platform supports POSIX timers,
+	// which are necessary for CPU profiling.
+	// This allows application code to detect and gracefully handle a lack of CPU profiling support.
+	#ifdef HAVE_TIMER_CREATE
 	REGISTER_LONG_CONSTANT("EXCIMER_CPU", EXCIMER_CPU, CONST_CS | CONST_PERSISTENT);
+	#endif
 
 #define REGISTER_EXCIMER_CLASS(class_name) \
 	INIT_CLASS_ENTRY(ce, #class_name, class_name ## _methods); \

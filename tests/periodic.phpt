@@ -25,7 +25,7 @@ if ($callCount > 5 && $callCount < 15) {
 if ($eventCount > 5 && $eventCount < 15) {
 	echo "event count: OK\n";
 } else {
-	echo "event count: FAILED\n";
+	echo "event count: FAILED - got $eventCount\n";
 }
 --EXPECT--
 call count: OK
