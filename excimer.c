@@ -448,6 +448,12 @@ static const zend_function_entry excimer_functions[] = {
 };
 /* }}} */
 
+/* {{{ INI Settings */
+PHP_INI_BEGIN()
+	PHP_INI_ENTRY("excimer.default_max_depth", "1000", PHP_INI_ALL, NULL)
+PHP_INI_END()
+/* }}} */
+
 static void *excimer_object_alloc_init(size_t object_size, zend_object_handlers *handlers, zend_class_entry *ce) /* {{{ */
 {
 #if PHP_VERSION_ID < 70300
@@ -507,6 +513,8 @@ static PHP_MINIT_FUNCTION(excimer)
 {
 	zend_class_entry ce;
 
+	REGISTER_INI_ENTRIES();
+	
 	REGISTER_LONG_CONSTANT("EXCIMER_REAL", EXCIMER_REAL, CONST_CS | CONST_PERSISTENT);
 
 	// Only define EXCIMER_CPU if the current platform supports POSIX timers,
@@ -556,6 +564,7 @@ static PHP_MINIT_FUNCTION(excimer)
  */
 static PHP_MSHUTDOWN_FUNCTION(excimer)
 {
+	UNREGISTER_INI_ENTRIES();
 	excimer_timer_module_shutdown();
 	return SUCCESS;
 }
@@ -586,6 +595,7 @@ static PHP_MINFO_FUNCTION(excimer)
 	php_info_print_table_header(2, "excimer support", "enabled");
 	php_info_print_table_row(2, "excimer version", PHP_EXCIMER_VERSION);
 	php_info_print_table_end();
+	DISPLAY_INI_ENTRIES();
 }
 /* }}} */
 
@@ -600,7 +610,7 @@ static zend_object *ExcimerProfiler_new(zend_class_entry *ce) /* {{{ */
 
 	object_init_ex(&profiler->z_log, ExcimerLog_ce);
 	log_obj = EXCIMER_OBJ_Z(ExcimerLog, profiler->z_log);
-	log_obj->log.max_depth = 0;
+	log_obj->log.max_depth = INI_INT("excimer.default_max_depth");
 	log_obj->log.epoch = excimer_timespec_to_ns(&now_ts);
 
 	ZVAL_NULL(&profiler->z_callback);
