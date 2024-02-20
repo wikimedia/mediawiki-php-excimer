@@ -41,6 +41,8 @@ typedef struct {
 	struct kevent kev;
 	/** The period of this timer */
 	struct timespec period;
+	/** The initial expiration time of this timer */
+	struct timespec initial;
 	/** Pointer to a callback to be invoked when this timer fires. */
 	excimer_os_timer_notify_function_t* notify_function;
 	/** Thread ID of the kqueue signal handler thread for this timer. */
