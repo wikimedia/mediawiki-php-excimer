@@ -19,7 +19,7 @@
 extern zend_module_entry excimer_module_entry;
 #define phpext_excimer_ptr &excimer_module_entry
 
-#define PHP_EXCIMER_VERSION "1.1.1"
+#define PHP_EXCIMER_VERSION "1.2.0"
 
 #ifdef PHP_WIN32
 #	define PHP_EXCIMER_API __declspec(dllexport)

@@ -25,10 +25,10 @@
   <email>krinkle@fastmail.com</email>
   <active>yes</active>
  </lead>
- <date>2023-03-13</date>
+ <date>2024-02-28</date>
  <version>
-  <release>1.1.1</release>
-  <api>1.1.1</api>
+  <release>1.2.0</release>
+  <api>1.2.0</api>
  </version>
  <stability>
   <release>stable</release>
@@ -36,7 +36,8 @@
  </stability>
  <license uri="https://www.apache.org/licenses/LICENSE-2.0" filesource="LICENSE">Apache 2.0</license>
  <notes>
-  - Restore support for PHP 7.1-7.3
+  - Add support for BSD and macOS (only real/wall-clock, no CPU timer).
+  - Add excimer.default_max_depth and default to 1000 (previously unlimited).
  </notes>
  <contents>
   <dir name="/">
@@ -44,9 +45,16 @@
    <file name="README.md" role="doc"/>
    <file name="config.m4" role="src"/>
    <file name="excimer.c" role="src"/>
-   <file name="excimer.ini" role="src"/>
+   <file name="excimer_events.h" role="src"/>
    <file name="excimer_log.c" role="src"/>
    <file name="excimer_log.h" role="src"/>
+   <file name="excimer_mutex.c" role="src"/>
+   <file name="excimer_mutex.h" role="src"/>
+   <file name="excimer_os_timer.h" role="src"/>
+   <file name="excimer_os_timer_kqueue.c" role="src"/>
+   <file name="excimer_os_timer_kqueue.h" role="src"/>
+   <file name="excimer_os_timer_posix.c" role="src"/>
+   <file name="excimer_os_timer_posix.h" role="src"/>
    <file name="excimer_timer.c" role="src"/>
    <file name="excimer_timer.h" role="src"/>
    <file name="php_excimer.h" role="src"/>
@@ -59,9 +67,13 @@
    </dir>
    <dir name="tests">
     <file name="cpu.phpt" role="test"/>
+    <file name="delayedPeriodic.phpt" role="test"/>
+    <file name="getTime.phpt" role="test"/>
     <file name="maxDepth.phpt" role="test"/>
+    <file name="oneshot.phpt" role="test"/>
     <file name="periodic.phpt" role="test"/>
     <file name="real.phpt" role="test"/>
+    <file name="subprocess.phpt" role="test"/>
     <file name="timeout.phpt" role="test"/>
     <file name="timer.phpt" role="test"/>
    </dir>
@@ -77,12 +89,24 @@
    </pearinstaller>
    <os>
     <name>linux</name>
+    <name>freebsd</name>
+    <name>darwin</name>
    </os>
   </required>
  </dependencies>
  <providesextension>excimer</providesextension>
  <extsrcrelease />
  <changelog>
+   <release>
+    <date>2023-03-13</date>
+    <version>
+     <release>1.1.1</release>
+     <api>1.1.1</api>
+     </version>
+     <notes>
+      - Restore support for PHP 7.1-7.3
+     </notes>
+   </release>
    <release>
     <date>2023-03-01</date>
     <version>
