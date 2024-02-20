@@ -407,7 +407,7 @@ zend_string *excimer_log_format_collapsed(excimer_log *log)
 	/* Concatenate lines */
 	ZEND_HASH_FOREACH_STR_KEY_VAL(ht_lines, str_line, zp_count) {
 		smart_str_append(&ss_out, str_line);
-		excimer_log_smart_str_append_printf(&ss_out, " %ld\n", Z_LVAL_P(zp_count));
+		excimer_log_smart_str_append_printf(&ss_out, " " ZEND_LONG_FMT "\n", Z_LVAL_P(zp_count));
 	}
 	ZEND_HASH_FOREACH_END();
 
