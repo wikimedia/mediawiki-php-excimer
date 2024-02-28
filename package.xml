@@ -88,9 +88,7 @@
     <min>1.8.0</min>
    </pearinstaller>
    <os>
-    <name>linux</name>
-    <name>freebsd</name>
-    <name>darwin</name>
+    <name>unix</name>
    </os>
   </required>
  </dependencies>
