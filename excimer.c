@@ -23,7 +23,11 @@
 #include "zend_exceptions.h"
 #include "zend_interfaces.h"
 #include "ext/spl/spl_exceptions.h"
+#if PHP_VERSION_ID < 80400
 #include "ext/standard/php_mt_rand.h"
+#else
+#include "ext/random/php_random.h"
+#endif
 #include "ext/standard/info.h"
 
 #if PHP_VERSION_ID < 70200
