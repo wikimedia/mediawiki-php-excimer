@@ -23,7 +23,11 @@
 #include "zend_exceptions.h"
 #include "zend_interfaces.h"
 #include "ext/spl/spl_exceptions.h"
+#if PHP_VERSION_ID < 80400
 #include "ext/standard/php_mt_rand.h"
+#else
+#include "ext/random/php_random.h"
+#endif
 #include "ext/standard/info.h"
 
 #if PHP_VERSION_ID < 70200
@@ -617,7 +621,7 @@ static zend_object *ExcimerProfiler_new(zend_class_entry *ce) /* {{{ */
 	profiler->event_type = EXCIMER_REAL;
 
 	// Stagger start time
-	initial = php_mt_rand() * EXCIMER_DEFAULT_PERIOD / UINT32_MAX;
+	initial = php_mt_rand_range(0, EXCIMER_DEFAULT_PERIOD);
 	excimer_set_timespec(&profiler->initial, initial);
 	excimer_set_timespec(&profiler->period, EXCIMER_DEFAULT_PERIOD);
 	log_obj->log.period = EXCIMER_DEFAULT_PERIOD * EXCIMER_BILLION;
@@ -666,7 +670,7 @@ static PHP_METHOD(ExcimerProfiler, setPeriod)
 	ZEND_PARSE_PARAMETERS_END();
 
 	// Stagger start time
-	initial = php_mt_rand() * period / UINT32_MAX;
+	initial = php_mt_rand_range(0, period);
 
 	excimer_set_timespec(&profiler->period, period);
 	excimer_set_timespec(&profiler->initial, initial);
