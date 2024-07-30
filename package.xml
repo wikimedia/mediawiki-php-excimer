@@ -25,10 +25,10 @@
   <email>krinkle@fastmail.com</email>
   <active>yes</active>
  </lead>
- <date>2024-02-29</date>
+ <date>2024-07-31</date>
  <version>
-  <release>1.2.1</release>
-  <api>1.2.1</api>
+  <release>1.2.2</release>
+  <api>1.2.2</api>
  </version>
  <stability>
   <release>stable</release>
@@ -36,8 +36,7 @@
  </stability>
  <license uri="https://www.apache.org/licenses/LICENSE-2.0" filesource="LICENSE">Apache 2.0</license>
  <notes>
-  - Fix compiler warning in excimer_log
-  - Fix invalid OS requirement in package.xml, allow all "unix"
+  - Fix PHP 8.4 compatibility (patch by Remi Collet)
  </notes>
  <contents>
   <dir name="/">
@@ -95,6 +94,17 @@
  <providesextension>excimer</providesextension>
  <extsrcrelease />
  <changelog>
+   <release>
+     <date>2024-02-29</date>
+     <version>
+      <release>1.2.1</release>
+      <api>1.2.1</api>
+     </version>
+     <notes>
+      - Fix compiler warning in excimer_log
+      - Fix invalid OS requirement in package.xml, allow all "unix"
+     </notes>
+   </release>
    <release>
     <date>2024-02-28</date>
     <version>
