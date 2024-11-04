@@ -621,7 +621,7 @@ static zend_object *ExcimerProfiler_new(zend_class_entry *ce) /* {{{ */
 	profiler->event_type = EXCIMER_REAL;
 
 	// Stagger start time
-	initial = php_mt_rand_range(0, EXCIMER_DEFAULT_PERIOD);
+	initial = php_mt_rand() * EXCIMER_DEFAULT_PERIOD / UINT32_MAX;
 	excimer_set_timespec(&profiler->initial, initial);
 	excimer_set_timespec(&profiler->period, EXCIMER_DEFAULT_PERIOD);
 	log_obj->log.period = EXCIMER_DEFAULT_PERIOD * EXCIMER_BILLION;
@@ -670,7 +670,7 @@ static PHP_METHOD(ExcimerProfiler, setPeriod)
 	ZEND_PARSE_PARAMETERS_END();
 
 	// Stagger start time
-	initial = php_mt_rand_range(0, period);
+	initial = php_mt_rand() * period / UINT32_MAX;
 
 	excimer_set_timespec(&profiler->period, period);
 	excimer_set_timespec(&profiler->initial, initial);
