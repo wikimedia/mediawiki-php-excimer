@@ -25,10 +25,10 @@
   <email>krinkle@fastmail.com</email>
   <active>yes</active>
  </lead>
- <date>2024-07-31</date>
+ <date>2024-11-15</date>
  <version>
-  <release>1.2.2</release>
-  <api>1.2.2</api>
+  <release>1.2.3</release>
+  <api>1.2.3</api>
  </version>
  <stability>
   <release>stable</release>
@@ -36,7 +36,7 @@
  </stability>
  <license uri="https://www.apache.org/licenses/LICENSE-2.0" filesource="LICENSE">Apache 2.0</license>
  <notes>
-  - Fix PHP 8.4 compatibility (patch by Remi Collet)
+  - Fix start time stagger, broken by previous release
  </notes>
  <contents>
   <dir name="/">
@@ -72,6 +72,7 @@
     <file name="oneshot.phpt" role="test"/>
     <file name="periodic.phpt" role="test"/>
     <file name="real.phpt" role="test"/>
+    <file name="stagger.phpt" role="test"/>
     <file name="subprocess.phpt" role="test"/>
     <file name="timeout.phpt" role="test"/>
     <file name="timer.phpt" role="test"/>
@@ -94,6 +95,16 @@
  <providesextension>excimer</providesextension>
  <extsrcrelease />
  <changelog>
+   <release>
+    <date>2024-07-31</date>
+    <version>
+     <release>1.2.2</release>
+     <api>1.2.2</api>
+    </version>
+    <notes>
+     - Fix PHP 8.4 compatibility (patch by Remi Collet)
+    </notes>
+   </release>
    <release>
      <date>2024-02-29</date>
      <version>
