@@ -54,9 +54,13 @@ $profiler->setEventType(EXCIMER_CPU);
 $profiler->setPeriod(0.1);
 $profiler->start();
 
+$j = 0;
 while (count($profiler->getLog()) < 30) {
 	for ($i = 0; $i < 100; $i++) {
 		foo();
+	}
+	if (++$j > 100000) {
+		break;
 	}
 }
 

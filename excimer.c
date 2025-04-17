@@ -75,6 +75,9 @@ typedef struct {
 	/** The maximum number of samples in z_log before z_callback is called. */
 	zend_long max_samples;
 
+	/** Whether a parameter has changed that requires reinitialisation of the timer. */
+	int need_reinit;
+
 	/** The timer backend object */
 	excimer_timer timer;
 	zend_object std;
@@ -144,6 +147,9 @@ typedef struct {
 
 	/** The event type, EXCIMER_REAL or EXCIMER_CPU */
 	zend_long event_type;
+
+	/** Whether a parameter has changed that requires reinitialisation of the timer. */
+	int need_reinit;
 
 	/** The event function, or null for no callback */
 	zval z_callback;
@@ -474,34 +480,6 @@ static void *excimer_object_alloc_init(size_t object_size, zend_object_handlers 
 }
 /* }}} */
 
-static void excimer_set_timespec(struct timespec *dest, double source) /* {{{ */
-{
-	double fractional, integral;
-	if (source < 0) {
-		dest->tv_sec = dest->tv_nsec = 0;
-		return;
-	}
-
-	fractional = modf(source, &integral);
-	dest->tv_sec = (time_t)integral;
-	dest->tv_nsec = (long)(fractional * 1000000000.0);
-	if (dest->tv_nsec >= EXCIMER_BILLION) {
-		dest->tv_nsec -= EXCIMER_BILLION;
-		dest->tv_sec ++;
-	}
-}
-/* }}} */
-
-static inline uint64_t excimer_timespec_to_ns(struct timespec *ts)
-{
-	return (uint64_t)ts->tv_nsec + (uint64_t)ts->tv_sec * EXCIMER_BILLION;
-}
-
-static inline double excimer_timespec_to_double(struct timespec *ts)
-{
-	return excimer_timespec_to_ns(ts) * 1e-9;
-}
-
 static inline void* excimer_check_object(zend_object *object, size_t offset, const zend_object_handlers *handlers)
 {
 	if (object->handlers != handlers) {
@@ -521,10 +499,9 @@ static PHP_MINIT_FUNCTION(excimer)
 	
 	REGISTER_LONG_CONSTANT("EXCIMER_REAL", EXCIMER_REAL, CONST_CS | CONST_PERSISTENT);
 
-	// Only define EXCIMER_CPU if the current platform supports POSIX timers,
-	// which are necessary for CPU profiling.
+	// Only define EXCIMER_CPU if the current platform supports it.
 	// This allows application code to detect and gracefully handle a lack of CPU profiling support.
-	#ifdef HAVE_TIMER_CREATE
+	#ifdef TIMERLIB_HAVE_CPU_CLOCK
 	REGISTER_LONG_CONSTANT("EXCIMER_CPU", EXCIMER_CPU, CONST_CS | CONST_PERSISTENT);
 	#endif
 
@@ -610,20 +587,21 @@ static zend_object *ExcimerProfiler_new(zend_class_entry *ce) /* {{{ */
 	struct timespec now_ts;
 	double initial;
 
-	clock_gettime(CLOCK_MONOTONIC, &now_ts);
+	timerlib_clock_get_time(TIMERLIB_REAL, &now_ts);
 
 	object_init_ex(&profiler->z_log, ExcimerLog_ce);
 	log_obj = EXCIMER_OBJ_Z(ExcimerLog, profiler->z_log);
 	log_obj->log.max_depth = INI_INT("excimer.default_max_depth");
-	log_obj->log.epoch = excimer_timespec_to_ns(&now_ts);
+	log_obj->log.epoch = timerlib_timespec_to_ns(&now_ts);
 
 	ZVAL_NULL(&profiler->z_callback);
 	profiler->event_type = EXCIMER_REAL;
+	profiler->need_reinit = 1;
 
 	// Stagger start time
 	initial = php_mt_rand() * EXCIMER_DEFAULT_PERIOD / UINT32_MAX;
-	excimer_set_timespec(&profiler->initial, initial);
-	excimer_set_timespec(&profiler->period, EXCIMER_DEFAULT_PERIOD);
+	timerlib_timespec_from_double(&profiler->initial, initial);
+	timerlib_timespec_from_double(&profiler->period, EXCIMER_DEFAULT_PERIOD);
 	log_obj->log.period = EXCIMER_DEFAULT_PERIOD * EXCIMER_BILLION;
 
 	return &profiler->std;
@@ -672,8 +650,8 @@ static PHP_METHOD(ExcimerProfiler, setPeriod)
 	// Stagger start time
 	initial = php_mt_rand() * period / UINT32_MAX;
 
-	excimer_set_timespec(&profiler->period, period);
-	excimer_set_timespec(&profiler->initial, initial);
+	timerlib_timespec_from_double(&profiler->period, period);
+	timerlib_timespec_from_double(&profiler->initial, initial);
 
 	ExcimerLog_obj *log = EXCIMER_OBJ_ZP(ExcimerLog, &profiler->z_log);
 	log->log.period = period * EXCIMER_BILLION;
@@ -697,6 +675,7 @@ static PHP_METHOD(ExcimerProfiler, setEventType)
 	}
 
 	profiler->event_type = event_type;
+	profiler->need_reinit = 1;
 }
 /* }}} */
 
@@ -808,16 +787,19 @@ static PHP_METHOD(ExcimerProfiler, flush)
 
 static void ExcimerProfiler_start(ExcimerProfiler_obj *profiler) /* {{{ */
 {
-	if (profiler->timer.is_valid) {
-		excimer_timer_destroy(&profiler->timer);
-	}
-	if (excimer_timer_init(&profiler->timer,
-		profiler->event_type,
-		ExcimerProfiler_event,
-		(void*)profiler) == FAILURE)
-	{
-		/* Error message already sent */
-		return;
+	if (profiler->need_reinit || !profiler->timer.is_valid) {
+		if (profiler->timer.is_valid) {
+			excimer_timer_destroy(&profiler->timer);
+		}
+		if (excimer_timer_init(&profiler->timer,
+			profiler->event_type,
+			ExcimerProfiler_event,
+			(void*)profiler) == FAILURE)
+		{
+			/* Error message already sent */
+			return;
+		}
+		profiler->need_reinit = 0;
 	}
 	excimer_timer_start(&profiler->timer,
 			&profiler->period,
@@ -828,7 +810,7 @@ static void ExcimerProfiler_start(ExcimerProfiler_obj *profiler) /* {{{ */
 static void ExcimerProfiler_stop(ExcimerProfiler_obj *profiler) /* {{{ */
 {
 	if (profiler->timer.is_valid) {
-		excimer_timer_destroy(&profiler->timer);
+		excimer_timer_stop(&profiler->timer);
 	}
 }
 /* }}} */
@@ -843,8 +825,8 @@ static void ExcimerProfiler_event(zend_long event_count, void *user_data) /* {{{
 
 	log = &log_obj->log;
 
-	clock_gettime(CLOCK_MONOTONIC, &now_ts);
-	now_ns = excimer_timespec_to_ns(&now_ts);
+	timerlib_clock_get_time(TIMERLIB_REAL, &now_ts);
+	now_ns = timerlib_timespec_to_ns(&now_ts);
 
 	excimer_log_add(log, EG(current_execute_data), event_count, now_ns);
 
@@ -1331,6 +1313,7 @@ static zend_object *ExcimerTimer_new(zend_class_entry *ce) /* {{{ */
 	ExcimerTimer_obj *timer_obj = EXCIMER_NEW_OBJECT(ExcimerTimer, ce);
 	ZVAL_UNDEF(&timer_obj->z_callback);
 	timer_obj->event_type = EXCIMER_REAL;
+	timer_obj->need_reinit = 1;
 	return &timer_obj->std;
 }
 /* }}} */
@@ -1363,6 +1346,7 @@ static PHP_METHOD(ExcimerTimer, setEventType)
 	}
 
 	timer_obj->event_type = event_type;
+	timer_obj->need_reinit = 1;
 }
 /* }}} */
 
@@ -1377,7 +1361,7 @@ static PHP_METHOD(ExcimerTimer, setInterval)
 		Z_PARAM_DOUBLE(initial)
 	ZEND_PARSE_PARAMETERS_END();
 
-	excimer_set_timespec(&timer_obj->initial, initial);
+	timerlib_timespec_from_double(&timer_obj->initial, initial);
 }
 /* }}} */
 
@@ -1392,7 +1376,7 @@ static PHP_METHOD(ExcimerTimer, setPeriod)
 		Z_PARAM_DOUBLE(period)
 	ZEND_PARSE_PARAMETERS_END();
 
-	excimer_set_timespec(&timer_obj->period, period);
+	timerlib_timespec_from_double(&timer_obj->period, period);
 }
 /* }}} */
 
@@ -1472,22 +1456,25 @@ static PHP_METHOD(ExcimerTimer, getTime)
 	ZEND_PARSE_PARAMETERS_END();
 
 	excimer_timer_get_time(&timer_obj->timer, &ts);
-	RETURN_DOUBLE(excimer_timespec_to_double(&ts));
+	RETURN_DOUBLE(timerlib_timespec_to_double(&ts));
 }
 /* }}} */
 
 static void ExcimerTimer_start(ExcimerTimer_obj *timer_obj) /* {{{ */
 {
-	if (timer_obj->timer.is_valid) {
-		excimer_timer_destroy(&timer_obj->timer);
-	}
-	if (excimer_timer_init(&timer_obj->timer,
-		timer_obj->event_type,
-		ExcimerTimer_event,
-		(void*)timer_obj) == FAILURE)
-	{
-		/* Error message already sent */
-		return;
+	if (timer_obj->need_reinit || !timer_obj->timer.is_valid) {
+		if (timer_obj->timer.is_valid) {
+			excimer_timer_destroy(&timer_obj->timer);
+		}
+		if (excimer_timer_init(&timer_obj->timer,
+			timer_obj->event_type,
+			ExcimerTimer_event,
+			(void*)timer_obj) == FAILURE)
+		{
+			/* Error message already sent */
+			return;
+		}
+		timer_obj->need_reinit = 0;
 	}
 	excimer_timer_start(&timer_obj->timer,
 			&timer_obj->period,
@@ -1498,7 +1485,7 @@ static void ExcimerTimer_start(ExcimerTimer_obj *timer_obj) /* {{{ */
 static void ExcimerTimer_stop(ExcimerTimer_obj *timer_obj) /* {{{ */
 {
 	if (timer_obj->timer.is_valid) {
-		excimer_timer_destroy(&timer_obj->timer);
+		excimer_timer_stop(&timer_obj->timer);
 	}
 }
 /* }}} */
@@ -1556,7 +1543,7 @@ PHP_FUNCTION(excimer_set_timeout)
 		ZVAL_NULL(return_value);
 	}
 
-	excimer_set_timespec(&timer_obj->initial, initial);
+	timerlib_timespec_from_double(&timer_obj->initial, initial);
 	ExcimerTimer_start(timer_obj);
 }
 /* }}} */

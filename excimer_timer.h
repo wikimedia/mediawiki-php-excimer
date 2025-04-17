@@ -17,9 +17,12 @@
 #define EXCIMER_TIMER_H
 
 #include "excimer_events.h"
-#include "excimer_os_timer.h"
+#include "timerlib/timerlib.h"
 
 typedef void (*excimer_timer_callback)(zend_long, void *);
+
+/* Forward declaration */
+typedef struct _excimer_timer_tls_t excimer_timer_tls_t;
 
 typedef struct _excimer_timer {
 	/** True if the object has been initialised and not destroyed */
@@ -35,18 +38,8 @@ typedef struct _excimer_timer {
 	zend_bool *vm_interrupt_ptr;
 #endif
 
-	/** A unique ID identifying this object. These IDs are never reused, so that
-	 * the ID can be used to identify events received for deleted objects. The
-	 * type is intptr_t because it is 64 bits on a 64-bit platform, making
-	 * an overflow less likely. Using a signed type means it can be converted
-	 * to zend_long without changing the interpretation. We can't use int64_t
-	 * or zend_long directly because the maximum width is sizeof(union sigval),
-	 * which is too small on a 32-bit platform.
-	 */
-	intptr_t id;
-
-	/** The timer returned by excimer_os_timer_create() */
-	excimer_os_timer_t os_timer;
+	/** The underlying timerlib timer */
+	timerlib_timer_t tl_timer;
 
 	/** The event callback. */
 	excimer_timer_callback callback;
@@ -54,30 +47,21 @@ typedef struct _excimer_timer {
 	/** The event callback user data */
 	void *user_data;
 
-	/** A pointer to excimer_timer_tls.event_counts */
-	HashTable ** event_counts_ptr;
+	/** 
+	 * The next pending timer, in a circular doubly-linked list of pending
+	 * timers, or NULL if the timer is not in the list.
+	 */
+	struct _excimer_timer *pending_next;
+	/** The previous pending timer */
+	struct _excimer_timer *pending_prev;
 
-	/** A pointer to excimer_timer_tls.mutex */
-	pthread_mutex_t *thread_mutex_ptr;
+	zend_long event_count;
+
+	/** The thread-local data associated with the thread that created the timer */
+	excimer_timer_tls_t *tls;
 } excimer_timer;
 
 typedef struct _excimer_timer_globals_t {
-	/**
-	 * A hashtable mapping unique ID (excimer_timer.id) to the excimer_timer
-	 * pointer. Use Z_PTR() to extract the pointer.
-	 */
-	HashTable *timers_by_id;
-
-	/**
-	 * The mutex protecting timers_by_id and next_id from concurrent modification.
-	 */
-	pthread_mutex_t mutex;
-
-	/**
-	 * The next ID to be used for excimer_timer.id
-	 */
-	intptr_t next_id;
-
 	/**
 	 * The old value of the zend_interrupt_function hook. If set, this must be
 	 * called to allow pcntl_signal() etc. to work.
@@ -86,15 +70,21 @@ typedef struct _excimer_timer_globals_t {
 } excimer_timer_globals_t;
 
 typedef struct _excimer_timer_tls_t {
-	/** A map of ID => event_count, protected by a mutex */
-	HashTable *event_counts;
-
-	/** The mutex protecting event_counts */
+	/** The mutex protecting the pending list */
 	pthread_mutex_t mutex;
 
-	/** A map of ID => *timer, which is not protected, it is only accessed by
-	 * the same thread */
-	HashTable *timers_by_id;
+	/**
+	 * The head of the list of pending timers. This is a doubly-linked list
+	 * because we need to randomly delete members when timers are destroyed.
+	 * It's circular, with the last element pointing back to the first element,
+	 * because that makes it a bit easier to check whether an element is in the
+	 * list. A circular list means that objects have a non-NULL prev/next if and
+	 * only if they are in the list.
+	 */
+	excimer_timer *pending_head;
+
+	/** The number of active timers in this thread */
+	unsigned long timers_active;
 } excimer_timer_tls_t;
 
 /**
@@ -140,6 +130,13 @@ int excimer_timer_init(excimer_timer *timer, int event_type,
  */
 void excimer_timer_start(excimer_timer *timer,
 	struct timespec *period, struct timespec *initial);
+
+/**
+ * Stop a timer. If there is no error, timer->is_running will be set to 0.
+ *
+ * @param timer The timer object
+ */
+void excimer_timer_stop(excimer_timer *timer);
 
 /**
  * Destroy the contents of a timer object

@@ -18,7 +18,7 @@ $start = microtime(true);
 $timer->start();
 
 $elapsed = 0;
-$interval = 10000;
+$interval = 50000;
 while ($elapsed < 1400000) {
 	usleep($interval);
     $elapsed += $interval;
