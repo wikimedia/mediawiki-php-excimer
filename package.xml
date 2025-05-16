@@ -25,10 +25,10 @@
   <email>krinkle@fastmail.com</email>
   <active>yes</active>
  </lead>
- <date>2024-11-15</date>
+ <date>2025-05-19</date>
  <version>
-  <release>1.2.3</release>
-  <api>1.2.3</api>
+  <release>1.2.4</release>
+  <api>1.2.4</api>
  </version>
  <stability>
   <release>stable</release>
@@ -36,7 +36,12 @@
  </stability>
  <license uri="https://www.apache.org/licenses/LICENSE-2.0" filesource="LICENSE">Apache 2.0</license>
  <notes>
-  - Fix start time stagger, broken by previous release
+  - Rewrite the backend to work around a glibc timer aliasing bug (T391426).
+    Timer creation and deletion are now more expensive, so applications should
+    try to avoid unnecessary creation and deletion. It's cheaper to stop and
+    start an existing timer. Handling events is cheaper, so profiling
+    performance is improved.
+  - Compile with -fvisibility=hidden
  </notes>
  <contents>
   <dir name="/">
@@ -49,14 +54,10 @@
    <file name="excimer_log.h" role="src"/>
    <file name="excimer_mutex.c" role="src"/>
    <file name="excimer_mutex.h" role="src"/>
-   <file name="excimer_os_timer.h" role="src"/>
-   <file name="excimer_os_timer_kqueue.c" role="src"/>
-   <file name="excimer_os_timer_kqueue.h" role="src"/>
-   <file name="excimer_os_timer_posix.c" role="src"/>
-   <file name="excimer_os_timer_posix.h" role="src"/>
    <file name="excimer_timer.c" role="src"/>
    <file name="excimer_timer.h" role="src"/>
    <file name="php_excimer.h" role="src"/>
+   <file name="timerlib_config.h" role="src"/>
    <dir name="stubs">
     <file name="ExcimerLog.php" role="doc"/>
     <file name="ExcimerLogEntry.php" role="doc"/>
@@ -65,6 +66,8 @@
     <file name="globals.php" role="doc"/>
    </dir>
    <dir name="tests">
+    <file name="aliasing.phpt" role="test"/>
+    <file name="concurrentTimers.phpt" role="test"/>
     <file name="cpu.phpt" role="test"/>
     <file name="delayedPeriodic.phpt" role="test"/>
     <file name="getTime.phpt" role="test"/>
@@ -76,6 +79,16 @@
     <file name="subprocess.phpt" role="test"/>
     <file name="timeout.phpt" role="test"/>
     <file name="timer.phpt" role="test"/>
+   </dir>
+   <dir name="timerlib">
+    <file name="README.md" role="doc"/>
+    <file name="timerlib.h" role="src"/>
+    <file name="timerlib_common.c" role="src"/>
+    <file name="timerlib_kqueue.c" role="src"/>
+    <file name="timerlib_kqueue.h" role="src"/>
+    <file name="timerlib_posix.c" role="src"/>
+    <file name="timerlib_posix.h" role="src"/>
+    <file name="timerlib_pthread_mutex.h" role="src"/>
    </dir>
   </dir>
  </contents>
@@ -95,6 +108,16 @@
  <providesextension>excimer</providesextension>
  <extsrcrelease />
  <changelog>
+   <release>
+    <date>2024-11-15</date>
+    <version>
+     <release>1.2.3</release>
+     <api>1.2.3</api>
+    </version>
+    <notes>
+     - Fix start time stagger, broken by previous release
+    </notes>
+   </release>
    <release>
     <date>2024-07-31</date>
     <version>
