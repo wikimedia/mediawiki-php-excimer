@@ -41,6 +41,9 @@ if test "$PHP_EXCIMER" != "no"; then
     PHP_EVAL_LIBLINE($LIBS, EXCIMER_SHARED_LIBADD)
   ])
 
+  dnl Avoid exporting symbols unnecessarily
+  AX_CHECK_COMPILE_FLAG([-fvisibility=hidden],
+    [CFLAGS="$CFLAGS -fvisibility=hidden"])
 
   PHP_SUBST(EXCIMER_SHARED_LIBADD)
   PHP_NEW_EXTENSION(excimer, excimer.c \
