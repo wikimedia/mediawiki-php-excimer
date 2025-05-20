@@ -27,8 +27,8 @@
  </lead>
  <date>2025-05-19</date>
  <version>
-  <release>1.2.4</release>
-  <api>1.2.4</api>
+  <release>1.2.5</release>
+  <api>1.2.5</api>
  </version>
  <stability>
   <release>stable</release>
@@ -36,12 +36,7 @@
  </stability>
  <license uri="https://www.apache.org/licenses/LICENSE-2.0" filesource="LICENSE">Apache 2.0</license>
  <notes>
-  - Rewrite the backend to work around a glibc timer aliasing bug (T391426).
-    Timer creation and deletion are now more expensive, so applications should
-    try to avoid unnecessary creation and deletion. It's cheaper to stop and
-    start an existing timer. Handling events is cheaper, so profiling
-    performance is improved.
-  - Compile with -fvisibility=hidden
+  - Fix build error with libtool 1.5
  </notes>
  <contents>
   <dir name="/">
@@ -108,6 +103,21 @@
  <providesextension>excimer</providesextension>
  <extsrcrelease />
  <changelog>
+   <release>
+    <date>2025-05-19</date>
+    <version>
+     <release>1.2.4</release>
+     <api>1.2.4</api>
+    </version>
+    <notes>
+     - Rewrite the backend to work around a glibc timer aliasing bug (T391426).
+       Timer creation and deletion are now more expensive, so applications should
+       try to avoid unnecessary creation and deletion. It's cheaper to stop and
+       start an existing timer. Handling events is cheaper, so profiling
+       performance is improved.
+     - Compile with -fvisibility=hidden
+    </notes>
+   </release>
    <release>
     <date>2024-11-15</date>
     <version>

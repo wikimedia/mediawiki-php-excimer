@@ -52,4 +52,7 @@ if test "$PHP_EXCIMER" != "no"; then
     excimer_log.c \
     timerlib/timerlib_common.c \
     $excimer_os_sources, $ext_shared)
+
+  dnl Create build directory (T394738)
+  PHP_ADD_BUILD_DIR([$ext_builddir/timerlib])
 fi
