@@ -481,7 +481,9 @@ void excimer_log_get_speedscope_data(excimer_log *log, zval *zp_data) {
 			zp_frame_index = zend_hash_add_new(ht_indexes_by_key, str_key, &z_tmp);
 		}
 		lp_frame_indexes[i] = Z_LVAL_P(zp_frame_index);
+		zend_string_release(str_key);
 	}
+	zend_array_destroy(ht_indexes_by_key);
 
 	/* zp_data["shared"] = ["frames" => ht_frames] */
 	zval z_shared;
